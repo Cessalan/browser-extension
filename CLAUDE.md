@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Liaison Assistant: a private, local-AI web app (PWA) for liaison nurses. Formerly a Chrome extension stub.
+Confi (formerly "Liaison Assistant"): a private, local-AI web app (PWA) for liaison nurses. Formerly a Chrome extension stub.
 This project is unrelated to NurseQuizAI.
 
 - Vite + TypeScript + Preact + Tailwind v4. Design tokens live in `src/index.css` (`@theme`).

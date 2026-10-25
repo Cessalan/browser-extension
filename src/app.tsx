@@ -31,8 +31,8 @@ export function App() {
       <header class="bg-nav text-white">
         <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <div class="flex items-center gap-3">
-            <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" class="h-7 w-7 rounded-md ring-1 ring-white/30" />
-            <h1 class="text-lg font-semibold">Liaison Assistant</h1>
+            <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" class="h-8 w-8" />
+            <h1 class="text-lg font-semibold tracking-tight">Confi</h1>
           </div>
           <nav class="flex gap-1">
             {PAGES.map((p) => (

@@ -18,13 +18,17 @@ export default defineConfig({
       // Ask before updating: an automatic reload would wipe an unsaved draft.
       registerType: 'prompt',
       manifest: {
-        name: 'Liaison Assistant',
-        short_name: 'Liaison',
-        description: 'Private, on-device assistant for liaison nurses.',
+        name: 'Confi',
+        short_name: 'Confi',
+        description: 'Private, on-device writing assistant for nurses: emails and notes.',
         theme_color: '#0f2a4a',
         background_color: '#f5f7fb',
         display: 'standalone',
-        icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' }],
+        icons: [
+          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' },
+          { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
+        ],
       },
       workbox: {
         // Precache the small app shell. The AI engines (large) are cached the first time they're used.
