@@ -9,6 +9,7 @@ This project is unrelated to NurseQuizAI.
 - `src/review/`: Review email screen (paste, check, rewrite, custom instruction, compare, copy). Prompts must keep the email's language (EN or FR). `sensitive.ts` flags patient identifiers without AI.
 - `src/speedtest/`: the Setup page (device check + AI mode). AI runs in Web Workers (`*.worker.ts`).
   - Text: WebLLM (`llm.ts`). `models.ts` maps AI modes (Faster / Standard / Smarter) to models.
+  - `recommend.ts` picks the mode for each computer (specs first, then measured speed). Used until the nurse picks one.
   - Never show model names or jargon in the main UI; technical details stay in the collapsed section.
   - Speech: transformers.js + Moonshine (`stt.ts`).
 - No backend. Never add network calls that send user data anywhere. CSP in `index.html` enforces this.

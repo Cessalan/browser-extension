@@ -1,6 +1,8 @@
 import type { ChatCompletionMessageParam, WebWorkerMLCEngine } from '@mlc-ai/web-llm';
 import { useEffect, useState } from 'preact/hooks';
-import { chatOptions, extraBody, fallbackModelId, loadMode, modeInfo, resolveModelId, saveMode, type AiMode } from '../speedtest/models';
+import { DEFAULT_MODE, chatOptions, extraBody, fallbackModelId, loadSavedMode, modeInfo, resolveModelId, saveMode, type AiMode } from '../speedtest/models';
+import { getDeviceInfo } from '../speedtest/device';
+import { recommendMode } from '../speedtest/recommend';
 
 export type AiStatus =
   | { state: 'idle'; cached: boolean | null }
@@ -16,8 +18,11 @@ export type Message = ChatCompletionMessageParam;
  */
 class LocalAI {
   status: AiStatus = { state: 'idle', cached: null };
-  /** The nurse's choice of Faster / Standard / Smarter, remembered on this computer. */
-  mode: AiMode = loadMode();
+  /** Faster / Standard / Smarter: the nurse's saved choice, or else what suits this computer (see resolveMode). */
+  mode: AiMode = loadSavedMode() ?? DEFAULT_MODE;
+  /** True when the nurse picked the mode themselves; otherwise Confi picks from the computer's specs. */
+  chosen = loadSavedMode() !== null;
+  private modeResolved: Promise<AiMode> | null = null;
   private engine: Promise<WebWorkerMLCEngine> | null = null;
   private loadedModelId: string | null = null;
   private modelIds: Promise<{ primary: string; fallback: string }> | null = null;
@@ -35,9 +40,11 @@ class LocalAI {
 
   /** Switches mode. A model already in memory is unloaded; the new one loads on next use. */
   async setMode(mode: AiMode) {
+    this.chosen = true;
+    saveMode(mode);
     if (mode === this.mode) return;
     this.mode = mode;
-    saveMode(mode);
+    this.modeResolved = Promise.resolve(mode);
     const engine = this.engine;
     this.engine = null;
     this.modelIds = null;
@@ -47,9 +54,20 @@ class LocalAI {
     void this.checkCached();
   }
 
+  /** The mode to use: the nurse's choice, or the best fit for this computer's specs. */
+  resolveMode(): Promise<AiMode> {
+    this.modeResolved ??= this.chosen
+      ? Promise.resolve(this.mode)
+      : getDeviceInfo()
+          .then((device) => (this.mode = recommendMode(device)))
+          .catch(() => this.mode);
+    return this.modeResolved;
+  }
+
   /** Picks the model for the current mode, using the 32-bit build on GPUs without 16-bit support. */
   private getModelIds() {
     this.modelIds ??= (async () => {
+      await this.resolveMode();
       const adapter = await navigator.gpu?.requestAdapter().catch(() => null);
       if (!adapter) throw new Error('This browser has no WebGPU. Use an up-to-date Chrome or Edge.');
       const f16 = adapter.features.has('shader-f16');

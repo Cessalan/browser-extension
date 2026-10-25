@@ -9,6 +9,7 @@ import type { LlmResult } from './llm';
 import type { SttResult } from './stt';
 import { AI_MODES, modeInfo, resolveModelId, type AiMode } from './models';
 import { formatReport, llmVerdict, sttVerdict, type Verdict } from './report';
+import { MODE_ORDER, isSoftwareGpu, recommendMode } from './recommend';
 
 const MODE_ICONS: Record<AiMode, LucideIcon> = { fast: Zap, standard: Star, smart: Brain };
 
@@ -20,7 +21,9 @@ export function SpeedTest() {
   const { t } = useI18n();
   const [device, setDevice] = useState<DeviceInfo | null>(null);
   const [mode, setMode] = useState<AiMode>(ai.mode);
-  const [llm, setLlm] = useState<LlmResult>();
+  const [chosen, setChosen] = useState(ai.chosen);
+  // The speed test result, and which mode it measured.
+  const [llm, setLlm] = useState<LlmResult & { mode: AiMode }>();
   const [stt, setStt] = useState<SttResult>();
   const [llmProgress, setLlmProgress] = useState<Progress>(null);
   const [sttProgress, setSttProgress] = useState<Progress>(null);
@@ -29,13 +32,17 @@ export function SpeedTest() {
 
   useEffect(() => {
     getDeviceInfo().then(setDevice);
+    void ai.resolveMode().then(setMode);
   }, []);
+
+  // What suits this computer: from its specs, refined by the speed test once it has run.
+  const recommended = device ? recommendMode(device, llm && { mode: llm.mode, tokensPerSecond: llm.tokensPerSecond }) : null;
 
   const busy = llmProgress !== null || sttProgress !== null;
 
   function chooseMode(next: AiMode) {
     setMode(next);
-    setLlm(undefined);
+    setChosen(true);
     void ai.setMode(next);
   }
 
@@ -49,7 +56,8 @@ export function SpeedTest() {
       // Loaded on demand so the app itself opens instantly.
       const { runLlmTest } = await import('./llm');
       const modelId = resolveModelId(modeInfo(mode).modelId, device.shaderF16);
-      setLlm(await runLlmTest(modelId, (fraction) => setLlmProgress({ fraction, text: progressText(t, fraction) })));
+      const result = await runLlmTest(modelId, (fraction) => setLlmProgress({ fraction, text: progressText(t, fraction) }));
+      setLlm({ ...result, mode });
     } catch (err) {
       setError(`${t('setup.writing')}: ${err instanceof Error ? err.message : err}`);
     } finally {
@@ -84,7 +92,7 @@ export function SpeedTest() {
         <p class="text-sm text-muted">{t('setup.intro')}</p>
       </div>
 
-      <ReadyBanner device={device} llm={llm} />
+      <ReadyBanner device={device} llm={llm} recommended={recommended} current={mode} onSwitch={chooseMode} />
 
       <Card title={t('setup.mode')}>
         <div class="grid gap-2 sm:grid-cols-3">
@@ -102,8 +110,8 @@ export function SpeedTest() {
                 <div class="flex items-center gap-2 font-medium">
                   <Icon size={16} class="text-brand" aria-hidden="true" />
                   {t(`mode.${m.mode}` as Key)}
-                  {m.mode === 'standard' && (
-                    <span class="ml-auto rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase text-white">{t('setup.recommended')}</span>
+                  {m.mode === recommended && (
+                    <span class="ml-auto whitespace-nowrap rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase text-white">{t('setup.recommended')}</span>
                   )}
                 </div>
                 <p class="mt-1 text-xs text-muted">{t(`mode.${m.mode}.desc` as Key)}</p>
@@ -114,7 +122,7 @@ export function SpeedTest() {
         </div>
         <div class="mt-3 flex flex-wrap items-center gap-3">
           <Button onClick={testLlm} disabled={busy || !device?.webgpu}>{t('setup.testMode')}</Button>
-          <span class="text-xs text-muted">{t('setup.modeSaved')}</span>
+          <span class="text-xs text-muted">{chosen ? t('setup.modeSaved') : t('setup.autoPicked')}</span>
         </div>
         <ProgressBar progress={llmProgress} />
         {llm && (
@@ -162,7 +170,8 @@ export function SpeedTest() {
             <Stat label="CPU cores" value={String(device.cores ?? '?')} />
             <Stat label="Chrome built-in AI" value={device.builtInAI} />
             <Stat label="Model" value={resolveModelId(modeInfo(mode).modelId, device.shaderF16)} />
-            {llm && <Stat label="Decode" value={`${llm.tokensPerSecond.toFixed(1)} tok/s`} />}
+            {llm && <Stat label="Decode" value={`${llm.tokensPerSecond.toFixed(1)} tok/s (${llm.mode})`} />}
+            <Stat label="Memory (reported)" value={device.memoryGB != null ? `${device.memoryGB} GB` : '?'} />
           </dl>
           {llm?.output && <pre class="mt-3 whitespace-pre-wrap rounded-md bg-canvas p-2 text-xs">{llm.output}</pre>}
           {stt?.text && <p class="mt-2 rounded-md bg-canvas p-2 text-xs">“{stt.text}”</p>}
@@ -182,7 +191,19 @@ function progressText(t: (k: Key, p?: Record<string, string | number>) => string
 }
 
 /** One plain-language answer to "can I use Confi on this computer?" */
-function ReadyBanner({ device, llm }: { device: DeviceInfo | null; llm?: LlmResult }) {
+function ReadyBanner({
+  device,
+  llm,
+  recommended,
+  current,
+  onSwitch,
+}: {
+  device: DeviceInfo | null;
+  llm?: LlmResult;
+  recommended: AiMode | null;
+  current: AiMode;
+  onSwitch: (mode: AiMode) => void;
+}) {
   const { t } = useI18n();
   let tone: 'good' | 'warn' | 'bad' | 'info' = 'info';
   let title: Key = 'setup.checking';
@@ -192,7 +213,7 @@ function ReadyBanner({ device, llm }: { device: DeviceInfo | null; llm?: LlmResu
     [tone, title, hint] = ['bad', 'setup.notSupported', 'setup.notSupportedHint'];
   } else if (device && llm) {
     const v = llmVerdict(llm.tokensPerSecond);
-    [tone, title, hint] = v === 'good' ? ['good', 'setup.ready', null] : v === 'ok' ? ['warn', 'setup.okSlow', 'setup.tryFaster'] : ['bad', 'setup.slow', 'setup.tryFaster'];
+    [tone, title] = v === 'good' ? ['good', 'setup.ready'] : v === 'ok' ? ['warn', 'setup.okSlow'] : ['bad', 'setup.slow'];
   } else if (device) {
     [tone, title, hint] = ['info', 'setup.runTest', null];
   }
@@ -211,9 +232,19 @@ function ReadyBanner({ device, llm }: { device: DeviceInfo | null; llm?: LlmResu
       <div>
         <p class="font-medium">{t(title)}</p>
         {hint && <p class="mt-0.5 text-sm text-ink/80">{t(hint)}</p>}
+        {device?.webgpu && recommended && recommended !== current && !llm && MODE_ORDER.indexOf(current) > MODE_ORDER.indexOf(recommended) ? (
+          <p class="mt-1 text-sm text-ink/80">{t('setup.testFirst')}</p>
+        ) : device?.webgpu && recommended && recommended !== current && (
+          <div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink">
+            <span>{t('setup.suggest', { mode: t(`mode.${recommended}` as Key) })}</span>
+            <Button variant="secondary" onClick={() => onSwitch(recommended)}>
+              {t('setup.switchTo', { mode: t(`mode.${recommended}` as Key) })}
+            </Button>
+          </div>
+        )}
         {device && (
           <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-            <Fact ok={device.webgpu}>{t('setup.graphics')}</Fact>
+            <Fact ok={device.webgpu && !isSoftwareGpu(device)}>{t('setup.graphics')}</Fact>
             {device.memoryGB != null && <Fact ok={device.memoryGB >= 8}>{t('setup.memory', { gb: device.memoryGB })}</Fact>}
             {device.storageFreeGB != null && <Fact ok={device.storageFreeGB >= 3}>{t('setup.space', { gb: device.storageFreeGB })}</Fact>}
           </div>

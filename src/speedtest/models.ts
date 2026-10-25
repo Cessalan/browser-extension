@@ -18,14 +18,15 @@ export function modeInfo(mode: AiMode) {
 
 const MODE_KEY = 'aiMode';
 
-export function loadMode(): AiMode {
+/** The mode the nurse picked on this computer, or null if they never chose (Confi then picks for them). */
+export function loadSavedMode(): AiMode | null {
   try {
     const saved = localStorage.getItem(MODE_KEY);
     if (AI_MODES.some((m) => m.mode === saved)) return saved as AiMode;
   } catch {
-    // Storage blocked: use the default.
+    // Storage blocked: treat as not chosen.
   }
-  return DEFAULT_MODE;
+  return null;
 }
 
 export function saveMode(mode: AiMode) {
