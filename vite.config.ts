@@ -23,8 +23,7 @@ export default defineConfig({
       workbox: {
         // Precache the small app shell. The AI engines (large) are cached the first time they're used.
         // Model weights are cached separately by the AI libraries themselves.
-        globPatterns: ['**/*.{js,css,html,svg}'],
-        globIgnores: ['**/*.worker-*.js', '**/llm-*.js', '**/stt-*.js'],
+        globPatterns: ['**/*.{css,html,svg}', 'assets/index-*.js'],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.origin === self.location.origin && /\/assets\/.+\.(js|wasm|mjs)$/.test(url.pathname),
