@@ -18,7 +18,7 @@ const MODE_ICONS: Record<AiMode, LucideIcon> = { fast: Zap, standard: Star, smar
 
 /**
  * "Setup" page: is this computer ready, and which AI mode to use.
- * Written for nurses: no model names or jargon. Technical numbers live in a collapsed section for IT.
+ * Written for everyday users: no model names or jargon. Technical numbers live in a collapsed section for IT.
  */
 export function SpeedTest() {
   const { t } = useI18n();

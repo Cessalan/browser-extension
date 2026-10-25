@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /*
-  Design tokens. Re-skin the whole app to match the nurses' existing software
+  Design tokens. Re-skin the whole app to match the users' existing software
   by changing only these values.
 */
 @theme {

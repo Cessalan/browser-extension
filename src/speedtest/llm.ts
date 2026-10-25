@@ -36,7 +36,7 @@ export async function runLlmTest(
     onProgress(1, 'Running test prompt…');
     const reply = await engine.chat.completions.create({
       messages: [
-        { role: 'system', content: 'You review emails written by a hospital liaison nurse. Reply with 3 short bullet points: what is unclear, what is missing, and one suggested fix.' },
+        { role: 'system', content: 'You review a short professional email. Reply with 3 short bullet points: what is unclear, what is missing, and one suggested fix.' },
         { role: 'user', content: SAMPLE_EMAIL },
       ],
       max_tokens: 160,

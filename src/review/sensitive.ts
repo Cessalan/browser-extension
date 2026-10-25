@@ -20,7 +20,7 @@ const PATTERNS: { kind: SensitiveKind; re: RegExp }[] = [
 ];
 
 /**
- * Finds details that could identify a patient, so the nurse can double-check
+ * Finds details that could identify a person (patient, client, employee), so the user can double-check
  * before sending. Plain pattern matching: instant, and nothing leaves the page.
  */
 export function findSensitive(text: string): SensitiveMatch[] {

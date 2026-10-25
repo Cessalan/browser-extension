@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import {
-  ArrowRight, Brain, CircleCheck, CloudOff, Download, FileSearch, HardDrive, Languages, Lock, MemoryStick, Monitor,
+  ArrowRight, Brain, Briefcase, HeartHandshake, Scale, Stethoscope, CircleCheck, CloudOff, Download, FileSearch, HardDrive, Languages, Lock, MemoryStick, Monitor,
   ShieldCheck, Sparkles, Star, TriangleAlert, UserX, WifiOff, Zap, type LucideIcon,
 } from 'lucide-preact';
 import { setLang, useI18n, type Key } from '../i18n';
@@ -75,6 +75,22 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
           <Value icon={Sparkles} title="land.v1.title" text="land.v1.text" />
           <Value icon={ShieldCheck} title="land.v2.title" text="land.v2.text" />
           <Value icon={Languages} title="land.v3.title" text="land.v3.text" />
+        </div>
+      </section>
+
+      {/* Who it's for */}
+      <section class="border-t border-line bg-canvas/50">
+        <div class="mx-auto max-w-6xl px-5 py-20">
+          <div class="max-w-2xl">
+            <h2 class="text-3xl font-semibold tracking-tight">{t('land.who.title')}</h2>
+            <p class="mt-4 text-lg leading-relaxed text-muted">{t('land.who.text')}</p>
+          </div>
+          <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Audience icon={Stethoscope} title="land.who.health" text="land.who.health.text" />
+            <Audience icon={Scale} title="land.who.legal" text="land.who.legal.text" />
+            <Audience icon={Briefcase} title="land.who.hr" text="land.who.hr.text" />
+            <Audience icon={HeartHandshake} title="land.who.social" text="land.who.social.text" />
+          </div>
         </div>
       </section>
 
@@ -196,6 +212,19 @@ function Value({ icon: Icon, title, text }: { icon: LucideIcon; title: Key; text
       </span>
       <h3 class="mt-5 text-lg font-semibold">{t(title)}</h3>
       <p class="mt-2 leading-relaxed text-muted">{t(text)}</p>
+    </div>
+  );
+}
+
+function Audience({ icon: Icon, title, text }: { icon: LucideIcon; title: Key; text: Key }) {
+  const { t } = useI18n();
+  return (
+    <div class="flex gap-4 rounded-2xl border border-line bg-surface p-5 shadow-card">
+      <Icon size={22} class="mt-0.5 shrink-0 text-brand" aria-hidden="true" />
+      <div>
+        <h3 class="font-semibold">{t(title)}</h3>
+        <p class="mt-1 text-sm leading-relaxed text-muted">{t(text)}</p>
+      </div>
     </div>
   );
 }

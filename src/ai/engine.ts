@@ -18,9 +18,9 @@ export type Message = ChatCompletionMessageParam;
  */
 class LocalAI {
   status: AiStatus = { state: 'idle', cached: null };
-  /** Faster / Standard / Smarter: the nurse's saved choice, or else what suits this computer (see resolveMode). */
+  /** Faster / Standard / Smarter: the user's saved choice, or else what suits this computer (see resolveMode). */
   mode: AiMode = loadSavedMode() ?? DEFAULT_MODE;
-  /** True when the nurse picked the mode themselves; otherwise Confi picks from the computer's specs. */
+  /** True when the user picked the mode themselves; otherwise Confi picks from the computer's specs. */
   chosen = loadSavedMode() !== null;
   private modeResolved: Promise<AiMode> | null = null;
   private engine: Promise<WebWorkerMLCEngine> | null = null;
@@ -54,7 +54,7 @@ class LocalAI {
     void this.checkCached();
   }
 
-  /** The mode to use: the nurse's choice, or the best fit for this computer's specs. */
+  /** The mode to use: the user's choice, or the best fit for this computer's specs. */
   resolveMode(): Promise<AiMode> {
     this.modeResolved ??= this.chosen
       ? Promise.resolve(this.mode)

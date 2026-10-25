@@ -1,5 +1,5 @@
 /**
- * What nurses choose between. They see "Faster / Standard / Smarter", never model names.
+ * What people choose between. They see "Faster / Standard / Smarter", never model names.
  * Sizes are approximate one-time downloads (4-bit versions).
  */
 export type AiMode = 'fast' | 'standard' | 'smart';
@@ -18,7 +18,7 @@ export function modeInfo(mode: AiMode) {
 
 const MODE_KEY = 'aiMode';
 
-/** The mode the nurse picked on this computer, or null if they never chose (Confi then picks for them). */
+/** The mode the user picked on this computer, or null if they never chose (Confi then picks for them). */
 export function loadSavedMode(): AiMode | null {
   try {
     const saved = localStorage.getItem(MODE_KEY);

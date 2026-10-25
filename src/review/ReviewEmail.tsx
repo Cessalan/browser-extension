@@ -77,7 +77,7 @@ export function ReviewEmail() {
     return () => removeEventListener('keydown', onKey);
   });
 
-  /** Selects a flagged detail in the editor so the nurse can see or delete it. */
+  /** Selects a flagged detail in the editor so the user can see or delete it. */
   const pendingSelection = useRef<SensitiveMatch | null>(null);
   function showMatch(m: SensitiveMatch) {
     pendingSelection.current = m;
@@ -139,7 +139,7 @@ export function ReviewEmail() {
     const text = instruction.trim();
     if (!text || running) return;
     if (task?.kind === 'rewrite' && task.done) {
-      // Keep diffing against the nurse's original email.
+      // Keep diffing against the user's original email.
       rewrite(quote(text, lang), task.original, customMessages(text, task.text));
     } else if (plain.trim()) {
       rewrite(quote(text, lang), draft, customMessages(text, draft));
@@ -472,7 +472,7 @@ function SensitiveBar({ matches, onSelect }: { matches: SensitiveMatch[]; onSele
   );
 }
 
-/** The AI status is only shown when the nurse might need to know or act: download, loading, or error. */
+/** The AI status is only shown when the user might need to know or act: download, loading, or error. */
 function needsAttention(status: AiStatus) {
   return status.state === 'loading' || status.state === 'error' || (status.state === 'idle' && status.cached === false);
 }

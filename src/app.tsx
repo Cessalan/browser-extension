@@ -105,7 +105,7 @@ export function App() {
   );
 }
 
-/** Shown when a new version has been deployed. The nurse chooses when to reload, so a draft is never lost. */
+/** Shown when a new version has been deployed. The user chooses when to reload, so a draft is never lost. */
 function UpdateBanner() {
   const { t } = useI18n();
   const {

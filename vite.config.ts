@@ -20,7 +20,7 @@ export default defineConfig({
       manifest: {
         name: 'Confi',
         short_name: 'Confi',
-        description: 'Private, on-device writing assistant for nurses: emails and notes.',
+        description: 'Private, on-device writing assistant for confidential text: emails, notes and reports.',
         theme_color: '#ffffff',
         background_color: '#f0f9ff',
         display: 'standalone',

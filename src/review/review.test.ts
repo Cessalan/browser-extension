@@ -26,10 +26,10 @@ describe('findSensitive', () => {
 
 describe('prompts', () => {
   it('asks the model to keep the email language', () => {
-    expect(rewriteMessages('shorter', 'Bonjour')[0].content).toContain('same language as the email');
+    expect(rewriteMessages('shorter', 'Bonjour')[0].content).toContain('same language as the text');
   });
 
-  it('includes the nurse instruction and the email', () => {
+  it('includes the user instruction and the email', () => {
     const [, user] = customMessages('  mets la demande en premier ', 'Bonjour Dr Roy');
     expect(user.content).toBe('Instruction: mets la demande en premier\n\nEmail:\nBonjour Dr Roy');
   });
