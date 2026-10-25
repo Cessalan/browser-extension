@@ -5,14 +5,14 @@
   by changing only these values.
 */
 @theme {
-  --color-nav: #0f2a4a;
-  --color-brand: #2563eb;
-  --color-brand-soft: #dbeafe;
+  --color-nav: #ffffff;
+  --color-brand: #0278b8; /* lightest sky blue that keeps white text readable (WCAG AA) */
+  --color-brand-soft: #e0f2fe;
   --color-surface: #ffffff;
-  --color-canvas: #f5f7fb;
+  --color-canvas: #f0f9ff;
   --color-ink: #0f172a;
   --color-muted: #64748b;
-  --color-line: #e2e8f0;
+  --color-line: #dbe7f3;
   --color-good: #15803d;
   --color-warn: #b45309;
   --color-bad: #b91c1c;

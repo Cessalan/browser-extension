@@ -28,7 +28,7 @@ export function App() {
 
   return (
     <div class="min-h-screen">
-      <header class="bg-nav text-white">
+      <header class="border-b border-line bg-nav text-ink">
         <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <div class="flex items-center gap-3">
             <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" class="h-8 w-8" />
@@ -38,7 +38,7 @@ export function App() {
             {PAGES.map((p) => (
               <a
                 href={p.hash}
-                class={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${p === page ? 'bg-white/15 font-medium' : 'text-white/75 hover:bg-white/10'}`}
+                class={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${p === page ? 'bg-brand-soft font-medium text-brand' : 'text-muted hover:bg-canvas hover:text-ink'}`}
               >
                 <p.icon size={15} aria-hidden="true" />
                 {t(p.label)}
@@ -46,12 +46,12 @@ export function App() {
             ))}
           </nav>
           <div class="ml-auto flex items-center gap-2">
-            <span class="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-white/90">
+            <span class="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-0.5 text-xs text-brand">
               <Lock size={12} aria-hidden="true" /> {t('app.private')}
             </span>
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded-md border border-white/25 px-2 py-0.5 text-xs hover:bg-white/10"
+              class="inline-flex items-center gap-1 rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:bg-canvas hover:text-ink"
               onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
               lang={lang === 'fr' ? 'en' : 'fr'}
             >

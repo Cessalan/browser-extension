@@ -21,8 +21,8 @@ export default defineConfig({
         name: 'Confi',
         short_name: 'Confi',
         description: 'Private, on-device writing assistant for nurses: emails and notes.',
-        theme_color: '#0f2a4a',
-        background_color: '#f5f7fb',
+        theme_color: '#ffffff',
+        background_color: '#f0f9ff',
         display: 'standalone',
         icons: [
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' },
