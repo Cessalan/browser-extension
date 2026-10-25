@@ -14,11 +14,9 @@ const en = {
   'update.draftHint': 'Copy your draft first: refreshing clears it.',
 
   // AI status
-  'ai.ready': 'AI ready · on this computer',
   'ai.starting': 'AI starting {pct}%',
   'ai.retry': "AI couldn't start · Retry",
   'ai.download': 'Download AI (~{mb} MB, once)',
-  'ai.checking': 'Checking AI…',
   'ai.startingLong': 'Starting the AI… {pct}%',
   'ai.firstTimeOnly': 'First time only. After this it starts in seconds.',
 
@@ -67,8 +65,10 @@ const en = {
   'check.close': 'Close',
 
   // Sensitive info
-  'sensitive.title': 'Patient details found',
-  'sensitive.hint': 'Send through secure email, or remove them:',
+  'sensitive.protectedOne': '{n} private detail protected',
+  'sensitive.protectedMany': '{n} private details protected',
+  'sensitive.hint': 'Kept on this computer. Use secure email when sending.',
+  'sensitive.why': 'Confi found these details and never sends them online. The AI runs on this computer.',
   'sensitive.jump': 'Show it in the email',
   'kind.ssn': 'SSN',
   'kind.nam': 'Health insurance no.',
@@ -145,11 +145,9 @@ const fr: Record<Key, string> = {
   'update.later': 'Plus tard',
   'update.draftHint': "Copiez votre brouillon d'abord : actualiser l'efface.",
 
-  'ai.ready': 'IA prête · sur cet ordinateur',
   'ai.starting': "Démarrage de l'IA {pct} %",
   'ai.retry': "L'IA n'a pas démarré · Réessayer",
   'ai.download': "Télécharger l'IA (~{mb} Mo, une fois)",
-  'ai.checking': "Vérification de l'IA…",
   'ai.startingLong': "Démarrage de l'IA… {pct} %",
   'ai.firstTimeOnly': 'La première fois seulement. Ensuite, elle démarre en quelques secondes.',
 
@@ -193,8 +191,10 @@ const fr: Record<Key, string> = {
   'check.stale': 'Vous avez modifié le courriel depuis cette vérification.',
   'check.close': 'Fermer',
 
-  'sensitive.title': 'Renseignements sur le patient détectés',
-  'sensitive.hint': 'Envoyez par courriel sécurisé ou retirez-les :',
+  'sensitive.protectedOne': '{n} renseignement protégé',
+  'sensitive.protectedMany': '{n} renseignements protégés',
+  'sensitive.hint': 'Gardés sur cet ordinateur. Envoyez par courriel sécurisé.',
+  'sensitive.why': "Confi a repéré ces renseignements et ne les envoie jamais en ligne. L'IA fonctionne sur cet ordinateur.",
   'sensitive.jump': 'Le montrer dans le courriel',
   'kind.ssn': 'NAS',
   'kind.nam': "N° d'assurance maladie",

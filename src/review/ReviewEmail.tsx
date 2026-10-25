@@ -5,7 +5,7 @@ import { Button } from '../ui';
 import { useI18n, type Lang } from '../i18n';
 import {
   Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
-  Scissors, ShieldAlert, Sparkles, SpellCheck, Square, Undo2, X, type LucideIcon,
+  Scissors, ShieldCheck, Sparkles, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
 import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, rewriteMessages, type RewriteId } from './prompts';
@@ -163,7 +163,7 @@ export function ReviewEmail() {
           </Button>
         ))}
         <InstructionBox
-          trailing={<AiPill status={status} />}
+          trailing={needsAttention(status) ? <AiPill status={status} /> : undefined}
           value={instruction}
           onInput={setInstruction}
           onSubmit={applyInstruction}
@@ -188,8 +188,8 @@ export function ReviewEmail() {
         <div class={`grid items-start gap-4 ${task ? 'lg:grid-cols-[minmax(0,1fr)_340px]' : ''}`}>
           <section class="rounded-xl border border-line bg-surface shadow-card">
             <div class="flex items-center gap-2 border-b border-line px-4 py-2">
-              <h3 class="font-medium">{t('editor.title')}</h3>
-              <span class="text-xs text-muted">{t('editor.words', { n: words })}</span>
+              <h3 class="whitespace-nowrap font-medium">{t('editor.title')}</h3>
+              <span class="whitespace-nowrap text-xs text-muted">{t('editor.words', { n: words })}</span>
               <div class="ml-auto flex gap-1">
                 <Button variant="ghost" onClick={() => { setDraft(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
                   {t('editor.undo')}
@@ -429,15 +429,21 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
 function SensitiveBar({ matches, onSelect }: { matches: SensitiveMatch[]; onSelect: (m: SensitiveMatch) => void }) {
   const { lang, t } = useI18n();
   return (
-    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm">
-      <span class="inline-flex items-center gap-1.5 font-medium text-warn">
-        <ShieldAlert size={16} aria-hidden="true" /> {t('sensitive.title')}
-      </span>
-      <span class="text-xs text-muted">{t('sensitive.hint')}</span>
+    <div class="rounded-xl border border-brand/20 bg-surface px-4 py-3 text-sm shadow-card">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span class="inline-flex items-center gap-2 font-medium text-ink">
+          <span class="flex h-7 w-7 items-center justify-center rounded-full bg-brand-soft text-brand">
+            <ShieldCheck size={16} aria-hidden="true" />
+          </span>
+          {t(matches.length === 1 ? 'sensitive.protectedOne' : 'sensitive.protectedMany', { n: matches.length })}
+        </span>
+        <span class="text-xs text-muted" title={t('sensitive.why')}>{t('sensitive.hint')}</span>
+      </div>
+      <div class="mt-2 flex flex-wrap gap-2 pl-9">
       {matches.map((m) => (
         <button
           type="button"
-          class="rounded-full border border-amber-300 bg-surface px-2 py-0.5 text-xs hover:border-warn hover:bg-amber-100"
+          class="rounded-full border border-line bg-canvas px-2.5 py-0.5 text-xs text-ink hover:border-brand/40 hover:bg-brand-soft/50"
           title={t('sensitive.jump')}
           onClick={() => onSelect(m)}
         >
@@ -446,8 +452,14 @@ function SensitiveBar({ matches, onSelect }: { matches: SensitiveMatch[]; onSele
           <code class="font-mono">{m.text}</code>
         </button>
       ))}
+      </div>
     </div>
   );
+}
+
+/** The AI status is only shown when the nurse might need to know or act: download, loading, or error. */
+function needsAttention(status: AiStatus) {
+  return status.state === 'loading' || status.state === 'error' || (status.state === 'idle' && status.cached === false);
 }
 
 function AiPill({ status }: { status: AiStatus }) {
@@ -455,11 +467,7 @@ function AiPill({ status }: { status: AiStatus }) {
   const pill = 'flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs';
   switch (status.state) {
     case 'ready':
-      return (
-        <span class={pill}>
-          <span class="h-2 w-2 rounded-full bg-good" /> {t('ai.ready')}
-        </span>
-      );
+      return null;
     case 'loading':
       return (
         <span class={pill}>
@@ -477,9 +485,7 @@ function AiPill({ status }: { status: AiStatus }) {
         <button type="button" class={`${pill} hover:bg-canvas`} onClick={() => void ai.load().catch(() => {})}>
           <Download size={13} aria-hidden="true" /> {t('ai.download', { mb: modeInfo(ai.mode).downloadMB })}
         </button>
-      ) : (
-        <span class={`${pill} text-muted`}>{t('ai.checking')}</span>
-      );
+      ) : null;
   }
 }
 
