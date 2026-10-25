@@ -45,7 +45,48 @@ export function ReviewEmail() {
 
   const sensitive = useMemo(() => findSensitive(draft), [draft]);
   const running = task !== null && !task.done;
-  const words = draft.trim() ? draft.trim().split(/\s+/).length : 0;
+  const words = countWords(draft);
+
+  // Drafts are never saved, so warn before the tab closes with one in progress.
+  useEffect(() => {
+    if (!draft.trim()) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    addEventListener('beforeunload', warn);
+    return () => removeEventListener('beforeunload', warn);
+  }, [draft.trim().length > 0]);
+
+  // Shortcuts while a suggestion is shown: Ctrl+Enter uses it, Esc keeps the original.
+  useEffect(() => {
+    if (task?.kind !== 'rewrite' || !task.done) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        replaceDraft(task.text);
+        setTask(null);
+      } else if (e.key === 'Escape') {
+        setTask(null);
+      }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  });
+
+  /** Selects a flagged detail in the editor so the nurse can see or delete it. */
+  const pendingSelection = useRef<SensitiveMatch | null>(null);
+  function showMatch(m: SensitiveMatch) {
+    pendingSelection.current = m;
+    if (task?.kind === 'rewrite') setTask(null); // the editor is hidden behind the compare view
+    else applySelection();
+  }
+  function applySelection() {
+    const m = pendingSelection.current;
+    const el = editor.current;
+    if (!m || !el) return;
+    pendingSelection.current = null;
+    el.focus();
+    el.setSelectionRange(m.index, m.index + m.text.length);
+  }
+  useEffect(applySelection); // runs once the editor is back on screen
 
   // Warm up the model in the background if it's already downloaded.
   useEffect(() => {
@@ -57,11 +98,11 @@ export function ReviewEmail() {
     setDraft(next);
   }
 
-  async function run(next: Task, messages: Message[]) {
+  async function run(next: Task, messages: Message[], maxTokens: number) {
     setError(null);
     setTask(next);
     try {
-      const text = await ai.generate(messages, (t) => setTask((cur) => cur && { ...cur, text: t }));
+      const text = await ai.generate(messages, (t) => setTask((cur) => cur && { ...cur, text: t }), maxTokens);
       setTask((cur) => cur && { ...cur, text: cur.kind === 'rewrite' ? cleanRewrite(text) : text, done: true });
     } catch (err) {
       setTask(null);
@@ -71,12 +112,14 @@ export function ReviewEmail() {
 
   function review() {
     if (!draft.trim() || running) return;
-    void run({ kind: 'review', text: '', done: false, forDraft: draft, startedAt: Date.now() }, reviewMessages(draft, lang));
+    void run({ kind: 'review', text: '', done: false, forDraft: draft, startedAt: Date.now() }, reviewMessages(draft, lang), 300);
   }
 
   /** `original` is what the diff compares against; `messages` may target a previous suggestion when refining. */
   function rewrite(label: string, original: string, messages: Message[]) {
-    void run({ kind: 'rewrite', label, original, messages, text: '', done: false, startedAt: Date.now() }, messages);
+    // A rewrite is about as long as its input; leave room so it never stops mid-sentence.
+    const maxTokens = Math.min(2000, Math.max(300, countWords(String(messages.at(-1)?.content ?? '')) * 2 + 150));
+    void run({ kind: 'rewrite', label, original, messages, text: '', done: false, startedAt: Date.now() }, messages, maxTokens);
   }
 
   // With a suggestion on screen, the instruction box refines that suggestion; otherwise it edits the draft.
@@ -129,7 +172,7 @@ export function ReviewEmail() {
         />
       </div>
 
-      {sensitive.length > 0 && <SensitiveBar matches={sensitive} />}
+      {sensitive.length > 0 && <SensitiveBar matches={sensitive} onSelect={showMatch} />}
       {error && <p class="rounded-md bg-red-50 p-3 text-sm text-bad">{error}</p>}
 
       {task?.kind === 'rewrite' ? (
@@ -176,6 +219,7 @@ export function ReviewEmail() {
                   {t('editor.example')}
                 </button>
               )}
+              {words > 1000 && <span class="text-xs text-warn">{t('editor.long')}</span>}
               <span class="ml-auto text-xs text-muted">{t('editor.notSaved')}</span>
             </div>
           </section>
@@ -241,10 +285,10 @@ function Compare({
       <div class="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3">
         {task.done ? (
           <>
-            <Button onClick={onUse} icon={Check}>{t('compare.use')}</Button>
+            <Button onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
             <Button variant="secondary" onClick={() => setEditing(!editing)} icon={Pencil}>{editing ? t('compare.showChanges') : t('compare.edit')}</Button>
             <Button variant="secondary" onClick={onRetry} icon={RotateCcw}>{t('compare.retry')}</Button>
-            <Button variant="ghost" onClick={onDiscard}>{t('compare.keepMine')}</Button>
+            <Button variant="ghost" onClick={onDiscard} title="Esc">{t('compare.keepMine')}</Button>
             {changes && (
               <span class="ml-auto text-xs text-muted">
                 <span class="text-brand">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
@@ -371,8 +415,8 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
   );
 }
 
-function SensitiveBar({ matches }: { matches: SensitiveMatch[] }) {
-  const { t } = useI18n();
+function SensitiveBar({ matches, onSelect }: { matches: SensitiveMatch[]; onSelect: (m: SensitiveMatch) => void }) {
+  const { lang, t } = useI18n();
   return (
     <div class="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm">
       <span class="inline-flex items-center gap-1.5 font-medium text-warn">
@@ -380,9 +424,16 @@ function SensitiveBar({ matches }: { matches: SensitiveMatch[] }) {
       </span>
       <span class="text-xs text-muted">{t('sensitive.hint')}</span>
       {matches.map((m) => (
-        <span class="rounded-full border border-amber-300 bg-surface px-2 py-0.5 text-xs">
-          {t(`kind.${m.kind}`)}: <code class="font-mono">{m.text}</code>
-        </span>
+        <button
+          type="button"
+          class="rounded-full border border-amber-300 bg-surface px-2 py-0.5 text-xs hover:border-warn hover:bg-amber-100"
+          title={t('sensitive.jump')}
+          onClick={() => onSelect(m)}
+        >
+          {t(`kind.${m.kind}`)}
+          {lang === 'fr' ? ' : ' : ': '}
+          <code class="font-mono">{m.text}</code>
+        </button>
       ))}
     </div>
   );
@@ -463,6 +514,10 @@ function InstructionBox({
       {trailing && <div class="flex shrink-0 items-center">{trailing}</div>}
     </form>
   );
+}
+
+function countWords(text: string) {
+  return text.trim() ? text.trim().split(/\s+/).length : 0;
 }
 
 function quote(instruction: string, lang: Lang) {

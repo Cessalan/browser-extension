@@ -8,6 +8,11 @@ const en = {
   'nav.speedTest': 'Speed test',
   'app.private': 'Runs on this computer only',
   'app.switchLang': 'Français',
+  'app.version': 'Version {v}',
+  'update.available': 'A new version is available.',
+  'update.refresh': 'Refresh',
+  'update.later': 'Later',
+  'update.draftHint': 'Copy your draft first: refreshing clears it.',
 
   // AI status
   'ai.ready': 'AI ready · on this computer',
@@ -40,6 +45,7 @@ const en = {
   'editor.copied': 'Copied',
   'editor.example': 'Try with an example',
   'editor.notSaved': 'Not saved. Closing the tab clears it.',
+  'editor.long': 'Long email: the AI works best under ~1,000 words.',
 
   // Review: compare
   'compare.removed': 'Removed text in red',
@@ -65,6 +71,7 @@ const en = {
   // Sensitive info
   'sensitive.title': 'Patient details found',
   'sensitive.hint': 'Send through secure email, or remove them:',
+  'sensitive.jump': 'Show it in the email',
   'kind.ssn': 'SSN',
   'kind.nam': 'Health insurance no.',
   'kind.mrn': 'Medical record no.',
@@ -115,6 +122,11 @@ const fr: Record<Key, string> = {
   'nav.speedTest': 'Test de vitesse',
   'app.private': 'Fonctionne sur cet ordinateur seulement',
   'app.switchLang': 'English',
+  'app.version': 'Version {v}',
+  'update.available': 'Une nouvelle version est disponible.',
+  'update.refresh': 'Actualiser',
+  'update.later': 'Plus tard',
+  'update.draftHint': "Copiez votre brouillon d'abord : actualiser l'efface.",
 
   'ai.ready': 'IA prête · sur cet ordinateur',
   'ai.starting': "Démarrage de l'IA {pct} %",
@@ -144,6 +156,7 @@ const fr: Record<Key, string> = {
   'editor.copied': 'Copié',
   'editor.example': 'Essayer avec un exemple',
   'editor.notSaved': "Rien n'est enregistré. Fermer l'onglet efface tout.",
+  'editor.long': "Courriel long : l'IA fonctionne mieux sous ~1 000 mots.",
 
   'compare.removed': 'Texte retiré en rouge',
   'compare.added': 'Texte ajouté en bleu',
@@ -166,6 +179,7 @@ const fr: Record<Key, string> = {
 
   'sensitive.title': 'Renseignements sur le patient détectés',
   'sensitive.hint': 'Envoyez par courriel sécurisé ou retirez-les :',
+  'sensitive.jump': 'Le montrer dans le courriel',
   'kind.ssn': 'NAS',
   'kind.nam': "N° d'assurance maladie",
   'kind.mrn': 'N° de dossier',

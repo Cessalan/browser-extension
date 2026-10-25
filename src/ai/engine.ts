@@ -91,7 +91,7 @@ class LocalAI {
   }
 
   /** Streams a reply. `onText` receives the full text so far. */
-  async generate(messages: Message[], onText: (text: string) => void, maxTokens = 600): Promise<string> {
+  async generate(messages: Message[], onText: (text: string) => void, maxTokens = 1024): Promise<string> {
     const engine = await this.load();
     const stream = await engine.chat.completions.create({
       messages,

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'preact/hooks';
 import { ReviewEmail } from './review/ReviewEmail';
 import { SpeedTest } from './speedtest/SpeedTest';
 import { setLang, useI18n, type Key } from './i18n';
-import { Gauge, Languages, Lock, Mail, type LucideIcon } from 'lucide-preact';
+import { Gauge, Languages, Lock, Mail, RefreshCw, type LucideIcon } from 'lucide-preact';
+import { useRegisterSW } from 'virtual:pwa-register/preact';
 
 const PAGES: { hash: string; label: Key; icon: LucideIcon; view: () => preact.JSX.Element }[] = [
   { hash: '#/', label: 'nav.review', icon: Mail, view: ReviewEmail },
@@ -59,9 +60,38 @@ export function App() {
           </div>
         </div>
       </header>
+      <UpdateBanner />
       <main class="mx-auto max-w-5xl px-4 py-6">
         <View />
       </main>
+      <footer class="mx-auto max-w-5xl px-4 pb-6 text-xs text-muted">{t('app.version', { v: __APP_VERSION__ })}</footer>
+    </div>
+  );
+}
+
+/** Shown when a new version has been deployed. The nurse chooses when to reload, so a draft is never lost. */
+function UpdateBanner() {
+  const { t } = useI18n();
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW();
+  if (!needRefresh) return null;
+  return (
+    <div class="border-b border-brand/20 bg-brand-soft">
+      <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-2 text-sm">
+        <RefreshCw size={16} class="text-brand" aria-hidden="true" />
+        <span class="font-medium">{t('update.available')}</span>
+        <span class="text-xs text-muted">{t('update.draftHint')}</span>
+        <div class="ml-auto flex gap-2">
+          <button type="button" class="rounded-md px-3 py-1 text-muted hover:bg-white/60" onClick={() => setNeedRefresh(false)}>
+            {t('update.later')}
+          </button>
+          <button type="button" class="rounded-md bg-brand px-3 py-1 font-medium text-white hover:brightness-110" onClick={() => void updateServiceWorker(true)}>
+            {t('update.refresh')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -2,15 +2,21 @@ import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import pkg from './package.json' with { type: 'json' };
+
+// Shown in the footer so we can tell which version someone is running.
+const version = `${pkg.version}${process.env.GITHUB_SHA ? `+${process.env.GITHUB_SHA.slice(0, 7)}` : '-dev'}`;
 
 // BASE_PATH is set by the GitHub Pages workflow (e.g. "/browser-extension/").
 export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
+  define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     preact(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Ask before updating: an automatic reload would wipe an unsaved draft.
+      registerType: 'prompt',
       manifest: {
         name: 'Liaison Assistant',
         short_name: 'Liaison',
