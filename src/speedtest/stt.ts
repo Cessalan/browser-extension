@@ -34,7 +34,11 @@ export async function runSttTest(onProgress: (fraction: number, text: string) =>
 }
 
 async function loadAudio16k(url: string): Promise<Float32Array> {
-  const bytes = await (await fetch(url)).arrayBuffer();
+  return decode16k(await (await fetch(url)).arrayBuffer());
+}
+
+/** Decodes any browser-supported audio file to 16 kHz mono, the rate speech models expect. */
+export async function decode16k(bytes: ArrayBuffer): Promise<Float32Array> {
   const ctx = new AudioContext({ sampleRate: 16000 });
   try {
     const decoded = await ctx.decodeAudioData(bytes);

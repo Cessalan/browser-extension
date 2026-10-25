@@ -67,4 +67,5 @@ export function extraBody(modelId: string): { enable_thinking: false } | undefin
   return modelId.startsWith('Qwen3') ? { enable_thinking: false } : undefined;
 }
 
-export const SPEECH_MODEL = 'onnx-community/moonshine-tiny-ONNX';
+/** Multilingual Whisper: voice typing in French and English (~80 MB, 8-bit). */
+export const SPEECH_MODEL = 'onnx-community/whisper-base';

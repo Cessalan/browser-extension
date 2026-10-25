@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { ai, useAiStatus, type AiStatus, type Message } from '../ai/engine';
 import { Button } from '../ui';
+import { Dictate } from './Dictate';
 import { useI18n, type Lang } from '../i18n';
 import {
   Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
@@ -216,7 +217,8 @@ export function ReviewEmail() {
             <div class="flex items-center gap-2 border-b border-line px-4 py-2">
               <h3 class="whitespace-nowrap font-medium">{t('editor.title')}</h3>
               <span class="whitespace-nowrap text-xs text-muted">{t('editor.words', { n: words })}</span>
-              <div class="ml-auto flex gap-1">
+              <div class="ml-auto flex items-center gap-1">
+                <Dictate editor={editor} disabled={running} />
                 <Button variant="ghost" onClick={() => { setEditorContent(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
                   {t('editor.undo')}
                 </Button>
