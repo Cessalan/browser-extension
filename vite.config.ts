@@ -7,10 +7,10 @@ import pkg from './package.json' with { type: 'json' };
 // Shown in the footer so we can tell which version someone is running.
 const version = `${pkg.version}${process.env.GITHUB_SHA ? `+${process.env.GITHUB_SHA.slice(0, 7)}` : '-dev'}`;
 
-// BASE_PATH is set by the GitHub Pages workflow (e.g. "/browser-extension/").
+// BASE_PATH is "/" on confi.ca; a project-page URL like github.io/browser-extension would need "/browser-extension/".
 const base = process.env.BASE_PATH ?? '/';
 // The public address, for canonical and social-preview links (they must be absolute).
-const siteUrl = process.env.SITE_URL ?? `https://cessalan.github.io${base}`;
+const siteUrl = process.env.SITE_URL ?? `https://confi.ca${base}`;
 
 export default defineConfig({
   base,

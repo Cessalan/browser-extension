@@ -27,7 +27,9 @@ jobs:
       - run: npm test
       - run: npm run build
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+          # Served at the root of the custom domain (set in Settings > Pages; public/CNAME records it).
+          BASE_PATH: /
+          SITE_URL: https://confi.ca/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
