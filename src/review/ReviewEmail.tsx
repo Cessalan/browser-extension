@@ -79,10 +79,20 @@ export function ReviewEmail() {
     void run({ kind: 'rewrite', label, original, messages, text: '', done: false, startedAt: Date.now() }, messages);
   }
 
+  // With a suggestion on screen, the instruction box refines that suggestion; otherwise it edits the draft.
+  const refining = task?.kind === 'rewrite' && task.done;
+
   function applyInstruction() {
     const text = instruction.trim();
-    if (!text || !canAct) return;
-    rewrite(quote(text, lang), draft, customMessages(text, draft));
+    if (!text || running) return;
+    if (task?.kind === 'rewrite' && task.done) {
+      // Keep diffing against the nurse's original email.
+      rewrite(quote(text, lang), task.original, customMessages(text, task.text));
+    } else if (draft.trim()) {
+      rewrite(quote(text, lang), draft, customMessages(text, draft));
+    } else {
+      return;
+    }
     setInstruction('');
   }
 
@@ -113,9 +123,9 @@ export function ReviewEmail() {
           value={instruction}
           onInput={setInstruction}
           onSubmit={applyInstruction}
-          placeholder={t('custom.placeholder')}
+          placeholder={refining ? t('compare.refine') : t('custom.placeholder')}
           button={t('custom.apply')}
-          disabled={!canAct}
+          disabled={running || (!refining && !draft.trim())}
         />
       </div>
 
@@ -129,7 +139,6 @@ export function ReviewEmail() {
           onChange={(text) => setTask({ ...task, text })}
           onUse={() => { replaceDraft(task.text); setTask(null); }}
           onRetry={() => rewrite(task.label, task.original, task.messages)}
-          onRefine={(text) => rewrite(quote(text, lang), task.original, customMessages(text, task.text))}
           onDiscard={() => setTask(null)}
         />
       ) : (
@@ -186,7 +195,6 @@ function Compare({
   onChange,
   onUse,
   onRetry,
-  onRefine,
   onDiscard,
 }: {
   task: Rewrite;
@@ -194,12 +202,14 @@ function Compare({
   onChange: (text: string) => void;
   onUse: () => void;
   onRetry: () => void;
-  onRefine: (instruction: string) => void;
   onDiscard: () => void;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
-  const [refine, setRefine] = useState('');
+  // A new suggestion (retry or refine) always opens in "show changes" mode.
+  useEffect(() => {
+    if (!task.done) setEditing(false);
+  }, [task.done]);
   const parts = useMemo(() => (task.done ? diffWords(task.original, task.text) : null), [task.done, task.original, task.text]);
   const changes = parts && countChanges(parts);
 
@@ -240,18 +250,6 @@ function Compare({
                 <span class="text-brand">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
               </span>
             )}
-            <InstructionBox
-              value={refine}
-              onInput={setRefine}
-              onSubmit={() => {
-                if (!refine.trim()) return;
-                setEditing(false);
-                onRefine(refine.trim());
-                setRefine('');
-              }}
-              placeholder={t('compare.refine')}
-              button={t('custom.apply')}
-            />
           </>
         ) : (
           <>
