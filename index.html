@@ -11,7 +11,9 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob: https://cdn.jsdelivr.net; worker-src 'self' blob:; connect-src 'self' blob: data: https://huggingface.co https://*.huggingface.co https://*.hf.co https://raw.githubusercontent.com https://cdn.jsdelivr.net; img-src 'self' data:; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'"
     />
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <!-- favicon.svg, not icon.svg: a new name makes browsers drop the old cached tab icon. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#ffffff" />
     <title>Confi</title>
