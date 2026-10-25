@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { ComponentChildren } from 'preact';
+import { Button, Card, ProgressBar, type Progress } from '../ui';
 import { getDeviceInfo, type DeviceInfo } from './device';
 import type { LlmResult } from './llm';
 import type { SttResult } from './stt';
 import { TEXT_MODELS, resolveModelId } from './models';
 import { formatReport, llmVerdict, sttVerdict, type Verdict } from './report';
-
-type Progress = { fraction: number; text: string } | null;
 
 export function SpeedTest() {
   const [device, setDevice] = useState<DeviceInfo | null>(null);
@@ -62,7 +60,7 @@ export function SpeedTest() {
   }
 
   return (
-    <div class="space-y-4">
+    <div class="mx-auto max-w-3xl space-y-4">
       <div>
         <h2 class="text-xl font-semibold">Device speed test</h2>
         <p class="text-sm text-muted">
@@ -150,15 +148,6 @@ export function SpeedTest() {
   );
 }
 
-function Card({ title, children }: { title: string; children: ComponentChildren }) {
-  return (
-    <section class="rounded-lg border border-line bg-surface p-4 shadow-sm">
-      <h3 class="mb-3 font-medium">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
 const VERDICT_STYLE: Record<Verdict, string> = {
   good: 'text-good',
   ok: 'text-warn',
@@ -172,44 +161,6 @@ function Stat({ label, value, verdict }: { label: string; value: string; verdict
       <dd class={`truncate font-medium ${verdict ? VERDICT_STYLE[verdict] : ''}`} title={value}>
         {value}
       </dd>
-    </div>
-  );
-}
-
-function Button({
-  children,
-  onClick,
-  disabled,
-  variant = 'primary',
-}: {
-  children: ComponentChildren;
-  onClick: () => void;
-  disabled?: boolean;
-  variant?: 'primary' | 'secondary';
-}) {
-  const style =
-    variant === 'primary'
-      ? 'bg-brand text-white hover:brightness-110'
-      : 'border border-line bg-surface hover:bg-canvas';
-  return (
-    <button
-      class={`rounded-md px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${style}`}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ProgressBar({ progress }: { progress: Progress }) {
-  if (!progress) return null;
-  return (
-    <div class="mt-3">
-      <div class="h-2 overflow-hidden rounded-full bg-brand-soft">
-        <div class="h-full bg-brand transition-all" style={{ width: `${Math.round(progress.fraction * 100)}%` }} />
-      </div>
-      <p class="mt-1 truncate text-xs text-muted">{progress.text}</p>
     </div>
   );
 }

@@ -20,7 +20,7 @@ export async function runLlmTest(
   onProgress: (fraction: number, text: string) => void,
 ): Promise<LlmResult> {
   const wasCached = await hasModelInCache(modelId).catch(() => false);
-  const worker = new Worker(new URL('./llm.worker.ts', import.meta.url), { type: 'module' });
+  const worker = new Worker(new URL('../ai/llm.worker.ts', import.meta.url), { type: 'module' });
 
   try {
     const t0 = performance.now();
