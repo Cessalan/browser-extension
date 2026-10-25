@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+/*
+  Design tokens. Re-skin the whole app to match the nurses' existing software
+  by changing only these values.
+*/
+@theme {
+  --color-brand: #0f766e;
+  --color-brand-soft: #ccfbf1;
+  --color-surface: #ffffff;
+  --color-canvas: #f8fafc;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-line: #e2e8f0;
+  --color-good: #15803d;
+  --color-warn: #b45309;
+  --color-bad: #b91c1c;
+  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  @apply bg-canvas text-ink font-sans antialiased;
+}
