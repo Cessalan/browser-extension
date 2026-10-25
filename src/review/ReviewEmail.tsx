@@ -4,7 +4,7 @@ import { ai, useAiStatus, type AiStatus, type Message } from '../ai/engine';
 import { Button } from '../ui';
 import { useI18n, type Lang } from '../i18n';
 import {
-  Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle, Pencil, RotateCcw,
+  Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
   Scissors, ShieldAlert, Sparkles, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
@@ -30,7 +30,7 @@ thx
 Jordan` };
 
 type Review = { kind: 'review'; text: string; done: boolean; forDraft: string; startedAt: number };
-type Rewrite = { kind: 'rewrite'; label: string; original: string; messages: Message[]; text: string; done: boolean; startedAt: number };
+type Rewrite = { kind: 'rewrite'; label: string; original: string; text: string; done: boolean; startedAt: number };
 type Task = Review | Rewrite;
 
 export function ReviewEmail() {
@@ -120,7 +120,7 @@ export function ReviewEmail() {
   function rewrite(label: string, original: string, messages: Message[]) {
     // A rewrite is about as long as its input; leave room so it never stops mid-sentence.
     const maxTokens = Math.min(2000, Math.max(300, countWords(String(messages.at(-1)?.content ?? '')) * 2 + 150));
-    void run({ kind: 'rewrite', label, original, messages, text: '', done: false, startedAt: Date.now() }, messages, maxTokens);
+    void run({ kind: 'rewrite', label, original, text: '', done: false, startedAt: Date.now() }, messages, maxTokens);
   }
 
   // With a suggestion on screen, the instruction box refines that suggestion; otherwise it edits the draft.
@@ -182,7 +182,6 @@ export function ReviewEmail() {
           status={status}
           onChange={(text) => setTask({ ...task, text })}
           onUse={() => { replaceDraft(task.text); setTask(null); }}
-          onRetry={() => rewrite(task.label, task.original, task.messages)}
           onDiscard={() => setTask(null)}
         />
       ) : (
@@ -239,19 +238,17 @@ function Compare({
   status,
   onChange,
   onUse,
-  onRetry,
   onDiscard,
 }: {
   task: Rewrite;
   status: AiStatus;
   onChange: (text: string) => void;
   onUse: () => void;
-  onRetry: () => void;
   onDiscard: () => void;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
-  // A new suggestion (retry or refine) always opens in "show changes" mode.
+  // A new suggestion (rewrite or refine) always opens in "show changes" mode.
   useEffect(() => {
     if (!task.done) setEditing(false);
   }, [task.done]);
@@ -268,7 +265,15 @@ function Compare({
           </div>
         </div>
         <div class="bg-brand-soft/30">
-          <PaneHeader title={t('compare.suggestion', { label: task.label })} hint={parts && !editing ? t('compare.added') : undefined} />
+          <PaneHeader
+            title={t('compare.suggestion', { label: task.label })}
+            hint={parts && !editing ? t('compare.added') : undefined}
+            action={
+              <button type="button" class="rounded-md p-1 text-muted hover:bg-white hover:text-ink" onClick={onDiscard} title={`${t('compare.keepMine')} (Esc)`} aria-label={t('compare.keepMine')}>
+                <X size={16} />
+              </button>
+            }
+          />
           {editing ? (
             <textarea
               class="block min-h-[300px] w-full resize-y bg-surface p-4 text-[15px] leading-relaxed outline-none ring-2 ring-inset ring-brand/40"
@@ -277,7 +282,11 @@ function Compare({
               autoFocus
             />
           ) : (
-            <div class="min-h-[300px] whitespace-pre-wrap p-4 text-[15px] leading-relaxed">
+            <div
+              class={`min-h-[300px] whitespace-pre-wrap p-4 text-[15px] leading-relaxed ${parts ? 'cursor-text rounded-b-xl hover:bg-white/60' : ''}`}
+              onClick={() => parts && setEditing(true)}
+              title={parts ? t('compare.clickToEdit') : undefined}
+            >
               {parts ? <DiffText parts={parts} side="after" /> : <Streaming text={task.text} startedAt={task.startedAt} status={status} />}
             </div>
           )}
@@ -287,9 +296,9 @@ function Compare({
         {task.done ? (
           <>
             <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
-            <Button variant="secondary" onClick={() => setEditing(!editing)} icon={Pencil}>{editing ? t('compare.showChanges') : t('compare.edit')}</Button>
-            <Button variant="secondary" onClick={onRetry} icon={RotateCcw}>{t('compare.retry')}</Button>
-            <Button variant="ghost" onClick={onDiscard} title="Esc">{t('compare.keepMine')}</Button>
+            <span class="text-xs text-muted">{editing ? (
+              <button type="button" class="underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
+            ) : t('compare.clickToEdit')}</span>
             {changes && (
               <span class="ml-auto text-xs text-muted">
                 <span class="text-brand">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
@@ -307,11 +316,12 @@ function Compare({
   );
 }
 
-function PaneHeader({ title, hint }: { title: string; hint?: string }) {
+function PaneHeader({ title, hint, action }: { title: string; hint?: string; action?: ComponentChildren }) {
   return (
-    <div class="flex items-center gap-2 border-b border-line px-4 py-2">
+    <div class="flex h-11 items-center gap-2 border-b border-line px-4">
       <h3 class="font-medium">{title}</h3>
       {hint && <span class="ml-auto text-xs text-muted">{hint}</span>}
+      {action && <span class={hint ? '' : 'ml-auto'}>{action}</span>}
     </div>
   );
 }
