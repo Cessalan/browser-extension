@@ -1,6 +1,6 @@
 import type { ChatCompletionMessageParam, WebWorkerMLCEngine } from '@mlc-ai/web-llm';
 import { useEffect, useState } from 'preact/hooks';
-import { TEXT_MODELS, resolveModelId } from '../speedtest/models';
+import { TEXT_MODELS, chatOptions, fallbackModelId, resolveModelId } from '../speedtest/models';
 
 export type AiStatus =
   | { state: 'idle'; cached: boolean | null }
@@ -17,7 +17,7 @@ export type Message = ChatCompletionMessageParam;
 class LocalAI {
   status: AiStatus = { state: 'idle', cached: null };
   private engine: Promise<WebWorkerMLCEngine> | null = null;
-  private modelId: Promise<string> | null = null;
+  private modelIds: Promise<{ primary: string; fallback: string }> | null = null;
   private listeners = new Set<(s: AiStatus) => void>();
 
   subscribe(fn: (s: AiStatus) => void) {
@@ -31,20 +31,22 @@ class LocalAI {
   }
 
   /** Picks the default model, using the 32-bit build on GPUs without 16-bit support. */
-  private getModelId() {
-    this.modelId ??= (async () => {
+  private getModelIds() {
+    this.modelIds ??= (async () => {
       const adapter = await navigator.gpu?.requestAdapter().catch(() => null);
       if (!adapter) throw new Error('This browser has no WebGPU. Use an up-to-date Chrome or Edge.');
-      return resolveModelId(TEXT_MODELS[0].id, adapter.features.has('shader-f16'));
+      const f16 = adapter.features.has('shader-f16');
+      return { primary: resolveModelId(TEXT_MODELS[0].id, f16), fallback: fallbackModelId(f16) };
     })();
-    return this.modelId;
+    return this.modelIds;
   }
 
   async checkCached() {
     if (this.status.state !== 'idle') return;
     try {
       const { hasModelInCache } = await import('@mlc-ai/web-llm');
-      const cached = await hasModelInCache(await this.getModelId());
+      const { primary, fallback } = await this.getModelIds();
+      const cached = (await hasModelInCache(primary)) || (await hasModelInCache(fallback));
       if (this.status.state === 'idle') this.set({ state: 'idle', cached });
     } catch {
       if (this.status.state === 'idle') this.set({ state: 'idle', cached: false });
@@ -55,11 +57,29 @@ class LocalAI {
     this.engine ??= (async () => {
       this.set({ state: 'loading', fraction: 0, text: 'Starting…' });
       await navigator.storage?.persist?.().catch(() => false);
-      const [{ CreateWebWorkerMLCEngine }, modelId] = await Promise.all([import('@mlc-ai/web-llm'), this.getModelId()]);
-      const worker = new Worker(new URL('./llm.worker.ts', import.meta.url), { type: 'module' });
-      const engine = await CreateWebWorkerMLCEngine(worker, modelId, {
-        initProgressCallback: (p) => this.set({ state: 'loading', fraction: p.progress, text: p.text }),
-      });
+      const [{ CreateWebWorkerMLCEngine }, { primary, fallback }] = await Promise.all([import('@mlc-ai/web-llm'), this.getModelIds()]);
+      const start = async (modelId: string) => {
+        const worker = new Worker(new URL('./llm.worker.ts', import.meta.url), { type: 'module' });
+        try {
+          return await CreateWebWorkerMLCEngine(
+            worker,
+            modelId,
+            { initProgressCallback: (p) => this.set({ state: 'loading', fraction: p.progress, text: p.text }) },
+            chatOptions(modelId),
+          );
+        } catch (err) {
+          worker.terminate();
+          throw err;
+        }
+      };
+      let engine: WebWorkerMLCEngine;
+      try {
+        engine = await start(primary);
+      } catch (err) {
+        if (primary === fallback) throw err;
+        console.warn(`${primary} failed to start, falling back to ${fallback}`, err);
+        engine = await start(fallback);
+      }
       this.set({ state: 'ready' });
       return engine;
     })().catch((err) => {
