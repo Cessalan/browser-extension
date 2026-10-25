@@ -50,6 +50,8 @@ const en = {
   'editor.copied': 'Copied',
   'editor.example': 'Try with an example',
   'editor.notSaved': 'Not saved. Closing the tab clears it.',
+  'review.failed': "The AI didn't finish this time. Your text is untouched.",
+  'review.tryAgain': 'Try again',
   'editor.long': 'Long text: the AI works best under ~1,000 words.',
 
   // Review: compare
@@ -123,6 +125,7 @@ const en = {
   'setup.readyIn': 'Ready in',
   'setup.firstSetup': 'First-time setup',
   'setup.voice': 'Voice typing',
+  'setup.testFailed': "{what}: the test didn't finish. Try again, or restart the browser if it keeps happening.",
   'setup.testVoice': 'Test voice typing',
   'setup.voiceInfo': 'Types out a short sample recording. ~60 MB, one time.',
   'setup.voiceSpeed': 'Voice typing speed',
@@ -267,6 +270,8 @@ const fr: Record<Key, string> = {
   'editor.copied': 'Copié',
   'editor.example': 'Essayer avec un exemple',
   'editor.notSaved': "Rien n'est enregistré. Fermer l'onglet efface tout.",
+  'review.failed': "L'IA n'a pas terminé cette fois. Votre texte n'a pas changé.",
+  'review.tryAgain': 'Réessayer',
   'editor.long': "Texte long : l'IA fonctionne mieux sous ~1 000 mots.",
 
   'compare.removed': 'Texte retiré en rouge',
@@ -336,6 +341,7 @@ const fr: Record<Key, string> = {
   'setup.readyIn': 'Prêt en',
   'setup.firstSetup': 'Première installation',
   'setup.voice': 'Dictée',
+  'setup.testFailed': "{what} : le test n'a pas abouti. Réessayez, ou redémarrez le navigateur si cela se reproduit.",
   'setup.testVoice': 'Tester la dictée',
   'setup.voiceInfo': 'Transcrit un court extrait audio. ~60 Mo, une seule fois.',
   'setup.voiceSpeed': 'Vitesse de dictée',

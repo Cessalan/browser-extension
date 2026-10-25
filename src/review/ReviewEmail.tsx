@@ -5,7 +5,7 @@ import { Button } from '../ui';
 import { useI18n, type Lang } from '../i18n';
 import {
   Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
-  Scissors, Sparkles, SpellCheck, Square, Undo2, X, type LucideIcon,
+  RefreshCw, Scissors, Sparkles, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
 import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, rewriteMessages, type RewriteId } from './prompts';
@@ -41,7 +41,8 @@ export function ReviewEmail() {
   const [draft, setDraft] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [task, setTask] = useState<Task | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** Set when the AI failed: retries the same request. The raw error is never shown. */
+  const [failed, setFailed] = useState<(() => void) | null>(null);
   const [copied, setCopied] = useState(false);
   const [instruction, setInstruction] = useState('');
   const status = useAiStatus();
@@ -109,14 +110,15 @@ export function ReviewEmail() {
   }
 
   async function run(next: Task, messages: Message[], maxTokens: number) {
-    setError(null);
+    setFailed(null);
     setTask(next);
     try {
       const text = await ai.generate(messages, (t) => setTask((cur) => cur && { ...cur, text: t }), maxTokens);
       setTask((cur) => cur && { ...cur, text: cur.kind === 'rewrite' ? cleanRewrite(text) : text, done: true });
     } catch (err) {
+      console.error(err);
       setTask(null);
-      setError(err instanceof Error ? err.message : String(err));
+      setFailed(() => () => void run({ ...next, text: '', startedAt: Date.now() }, messages, maxTokens));
     }
   }
 
@@ -191,7 +193,14 @@ export function ReviewEmail() {
       </div>
 
       {sensitive.length > 0 && <SensitiveBar matches={sensitive} onSelect={showMatch} />}
-      {error && <p class="rounded-md bg-red-50 p-3 text-sm text-bad">{error}</p>}
+      {failed && (
+        <div class="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-sm shadow-card">
+          <span class="text-muted">{t('review.failed')}</span>
+          <Button variant="secondary" icon={RefreshCw} onClick={failed}>
+            {t('review.tryAgain')}
+          </Button>
+        </div>
+      )}
 
       {task?.kind === 'rewrite' ? (
         <Compare
@@ -491,7 +500,7 @@ function AiPill({ status }: { status: AiStatus }) {
       );
     case 'error':
       return (
-        <button type="button" class={`${pill} border-red-200 bg-red-50 text-bad`} title={status.message} onClick={() => void ai.load().catch(() => {})}>
+        <button type="button" class={`${pill} border-red-200 bg-red-50 text-bad`} onClick={() => void ai.load().catch(() => {})}>
           {t('ai.retry')}
         </button>
       );

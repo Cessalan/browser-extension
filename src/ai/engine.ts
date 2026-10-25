@@ -24,6 +24,7 @@ class LocalAI {
   chosen = loadSavedMode() !== null;
   private modeResolved: Promise<AiMode> | null = null;
   private engine: Promise<WebWorkerMLCEngine> | null = null;
+  private worker: Worker | null = null;
   private loadedModelId: string | null = null;
   private modelIds: Promise<{ primary: string; fallback: string }> | null = null;
   private listeners = new Set<(s: AiStatus) => void>();
@@ -96,12 +97,14 @@ class LocalAI {
       const start = async (modelId: string) => {
         const worker = new Worker(new URL('./llm.worker.ts', import.meta.url), { type: 'module' });
         try {
-          return await CreateWebWorkerMLCEngine(
+          const engine = await CreateWebWorkerMLCEngine(
             worker,
             modelId,
             { initProgressCallback: (p) => this.set({ state: 'loading', fraction: p.progress, text: p.text }) },
             chatOptions(modelId),
           );
+          this.worker = worker;
+          return engine;
         } catch (err) {
           worker.terminate();
           throw err;
@@ -127,8 +130,31 @@ class LocalAI {
     return this.engine;
   }
 
-  /** Streams a reply. `onText` receives the full text so far. */
+  /** Drops a dead engine so the next use starts a fresh one. */
+  private discard() {
+    this.engine = null;
+    this.loadedModelId = null;
+    this.worker?.terminate();
+    this.worker = null;
+  }
+
+  /**
+   * Streams a reply. `onText` receives the full text so far.
+   * The engine can die under us (GPU reset, computer asleep: "Object has already been disposed"),
+   * so a failure restarts it and tries once more before giving up.
+   */
   async generate(messages: Message[], onText: (text: string) => void, maxTokens = 1024): Promise<string> {
+    try {
+      return await this.stream(messages, onText, maxTokens);
+    } catch (err) {
+      console.warn('AI failed, restarting it and trying again', err);
+      this.discard();
+      onText('');
+      return await this.stream(messages, onText, maxTokens);
+    }
+  }
+
+  private async stream(messages: Message[], onText: (text: string) => void, maxTokens: number): Promise<string> {
     const engine = await this.load();
     const stream = await engine.chat.completions.create({
       messages,
@@ -146,7 +172,7 @@ class LocalAI {
   }
 
   async stop() {
-    (await this.engine)?.interruptGenerate();
+    (await this.engine?.catch(() => null))?.interruptGenerate();
   }
 }
 

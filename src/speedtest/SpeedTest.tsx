@@ -62,7 +62,8 @@ export function SpeedTest() {
       const result = await runLlmTest(modelId, (fraction) => setLlmProgress({ fraction, text: progressText(t, fraction) }));
       setLlm({ ...result, mode });
     } catch (err) {
-      setError(`${t('setup.writing')}: ${err instanceof Error ? err.message : err}`);
+      console.error(err);
+      setError(t('setup.testFailed', { what: t('setup.writing') }));
     } finally {
       setLlmProgress(null);
     }
@@ -75,7 +76,8 @@ export function SpeedTest() {
       const { runSttTest } = await import('./stt');
       setStt(await runSttTest((fraction) => setSttProgress({ fraction, text: progressText(t, fraction) })));
     } catch (err) {
-      setError(`${t('setup.voice')}: ${err instanceof Error ? err.message : err}`);
+      console.error(err);
+      setError(t('setup.testFailed', { what: t('setup.voice') }));
     } finally {
       setSttProgress(null);
     }
