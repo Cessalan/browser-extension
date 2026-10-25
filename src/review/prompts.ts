@@ -4,6 +4,9 @@ import type { Key, Lang } from '../i18n';
 const BASE = 'You help a hospital liaison nurse edit emails.';
 const KEEP_FACTS =
   'Keep every name, date, time, number and fact exactly as written. Do not invent information. Reply with only the email text, no introduction or notes.';
+// Emails carry formatting as Markdown; small models keep it when told explicitly.
+const KEEP_FORMAT =
+  'The email uses Markdown formatting (**bold**, *italic*, <u>underline</u>, ==highlight==, "- " bullet lists, "1." numbered lists). Keep this formatting where it still fits and reply in the same Markdown.';
 // The nurse may write in English or French; never switch languages on them.
 const SAME_LANGUAGE = 'Write in the same language as the email (English or French), unless the instruction asks for another language.';
 
@@ -19,7 +22,7 @@ export type RewriteId = (typeof REWRITES)[number]['id'];
 export function rewriteMessages(id: RewriteId, draft: string): Message[] {
   const { instruction } = REWRITES.find((r) => r.id === id)!;
   return [
-    { role: 'system', content: `${BASE} ${instruction} ${KEEP_FACTS} ${SAME_LANGUAGE}` },
+    { role: 'system', content: `${BASE} ${instruction} ${KEEP_FACTS} ${KEEP_FORMAT} ${SAME_LANGUAGE}` },
     { role: 'user', content: draft },
   ];
 }
@@ -27,7 +30,7 @@ export function rewriteMessages(id: RewriteId, draft: string): Message[] {
 /** The nurse's own instruction, in any language ("put the request first", "rends-le plus chaleureux"…). */
 export function customMessages(instruction: string, draft: string): Message[] {
   return [
-    { role: 'system', content: `${BASE} Apply the nurse's instruction to the email. ${KEEP_FACTS} ${SAME_LANGUAGE}` },
+    { role: 'system', content: `${BASE} Apply the nurse's instruction to the email. ${KEEP_FACTS} ${KEEP_FORMAT} ${SAME_LANGUAGE}` },
     { role: 'user', content: `Instruction: ${instruction.trim()}\n\nEmail:\n${draft}` },
   ];
 }

@@ -5,7 +5,7 @@ import { Button } from '../ui';
 import { useI18n, type Lang } from '../i18n';
 import {
   Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
-  Scissors, ShieldCheck, Sparkles, SpellCheck, Square, Undo2, X, type LucideIcon,
+  Scissors, Sparkles, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
 import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, rewriteMessages, type RewriteId } from './prompts';
@@ -13,6 +13,9 @@ import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, r
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
 import { countChanges, diffWords, type DiffPart } from './diff';
 import { modeInfo } from '../speedtest/models';
+import type { Editor } from '@tiptap/core';
+import { FormatBar, RichEditor, selectText } from './RichEditor';
+import { markdownToHtml, markdownToPlain } from './format';
 
 // Made-up examples. Never use real patient data here.
 const EXAMPLE_FR = `Bonjour Dre Tremblay,
@@ -34,6 +37,7 @@ type Rewrite = { kind: 'rewrite'; label: string; original: string; text: string;
 type Task = Review | Rewrite;
 
 export function ReviewEmail() {
+  // The draft as Markdown (what the AI reads); the editor shows it as rich text.
   const [draft, setDraft] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [task, setTask] = useState<Task | null>(null);
@@ -42,19 +46,20 @@ export function ReviewEmail() {
   const [instruction, setInstruction] = useState('');
   const status = useAiStatus();
   const { lang, t } = useI18n();
-  const editor = useRef<HTMLTextAreaElement>(null);
+  const [editor, setEditor] = useState<Editor | null>(null);
 
-  const sensitive = useMemo(() => findSensitive(draft), [draft]);
+  const plain = useMemo(() => markdownToPlain(draft), [draft]);
+  const sensitive = useMemo(() => findSensitive(plain), [plain]);
   const running = task !== null && !task.done;
-  const words = countWords(draft);
+  const words = countWords(plain);
 
   // Drafts are never saved, so warn before the tab closes with one in progress.
   useEffect(() => {
-    if (!draft.trim()) return;
+    if (!plain.trim()) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     addEventListener('beforeunload', warn);
     return () => removeEventListener('beforeunload', warn);
-  }, [draft.trim().length > 0]);
+  }, [plain.trim().length > 0]);
 
   // Shortcuts while a suggestion is shown: Ctrl+Enter uses it, Esc keeps the original.
   useEffect(() => {
@@ -81,11 +86,9 @@ export function ReviewEmail() {
   }
   function applySelection() {
     const m = pendingSelection.current;
-    const el = editor.current;
-    if (!m || !el) return;
+    if (!m || !editor) return;
     pendingSelection.current = null;
-    el.focus();
-    el.setSelectionRange(m.index, m.index + m.text.length);
+    selectText(editor, m.text);
   }
   useEffect(applySelection); // runs once the editor is back on screen
 
@@ -94,9 +97,15 @@ export function ReviewEmail() {
     if (status.state === 'idle' && status.cached) void ai.load().catch(() => {});
   }, [status]);
 
+  /** Shows `md` in the editor (if it's on screen; otherwise it loads `draft` when it comes back). */
+  function setEditorContent(md: string) {
+    editor?.commands.setContent(md ? markdownToHtml(md) : '', { emitUpdate: false });
+    setDraft(md);
+  }
+
   function replaceDraft(next: string) {
     setHistory((h) => [...h.slice(-19), draft]);
-    setDraft(next);
+    setEditorContent(next);
   }
 
   async function run(next: Task, messages: Message[], maxTokens: number) {
@@ -112,8 +121,8 @@ export function ReviewEmail() {
   }
 
   function review() {
-    if (!draft.trim() || running) return;
-    void run({ kind: 'review', text: '', done: false, forDraft: draft, startedAt: Date.now() }, reviewMessages(draft, lang), 300);
+    if (!plain.trim() || running) return;
+    void run({ kind: 'review', text: '', done: false, forDraft: draft, startedAt: Date.now() }, reviewMessages(plain, lang), 300);
   }
 
   /** `original` is what the diff compares against; `messages` may target a previous suggestion when refining. */
@@ -132,7 +141,7 @@ export function ReviewEmail() {
     if (task?.kind === 'rewrite' && task.done) {
       // Keep diffing against the nurse's original email.
       rewrite(quote(text, lang), task.original, customMessages(text, task.text));
-    } else if (draft.trim()) {
+    } else if (plain.trim()) {
       rewrite(quote(text, lang), draft, customMessages(text, draft));
     } else {
       return;
@@ -140,13 +149,21 @@ export function ReviewEmail() {
     setInstruction('');
   }
 
+  /** Copies rich text (keeps bold, lists… when pasted into Outlook or Gmail) with a plain-text fallback. */
   async function copy() {
-    await navigator.clipboard.writeText(draft);
+    const html = editor?.getHTML() ?? markdownToHtml(draft);
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) }),
+      ]);
+    } catch {
+      await navigator.clipboard.writeText(plain);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const canAct = draft.trim().length > 0 && !running;
+  const canAct = plain.trim().length > 0 && !running;
 
   return (
     <div class="space-y-4">
@@ -169,7 +186,7 @@ export function ReviewEmail() {
           onSubmit={applyInstruction}
           placeholder={refining ? t('compare.refine') : t('custom.placeholder')}
           button={t('custom.apply')}
-          disabled={running || (!refining && !draft.trim())}
+          disabled={running || (!refining && !plain.trim())}
         />
       </div>
 
@@ -191,7 +208,7 @@ export function ReviewEmail() {
               <h3 class="whitespace-nowrap font-medium">{t('editor.title')}</h3>
               <span class="whitespace-nowrap text-xs text-muted">{t('editor.words', { n: words })}</span>
               <div class="ml-auto flex gap-1">
-                <Button variant="ghost" onClick={() => { setDraft(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
+                <Button variant="ghost" onClick={() => { setEditorContent(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
                   {t('editor.undo')}
                 </Button>
                 <Button variant="ghost" onClick={() => { replaceDraft(''); setTask(null); }} disabled={!draft} icon={Eraser}>
@@ -199,23 +216,23 @@ export function ReviewEmail() {
                 </Button>
               </div>
             </div>
-            <textarea
-              ref={editor}
-              class="block min-h-[420px] w-full resize-y bg-transparent p-4 text-[15px] leading-relaxed outline-none"
+            <div class="border-b border-line px-2.5 py-1.5">
+              <FormatBar editor={editor} />
+            </div>
+            <RichEditor
+              initialMarkdown={draft}
               placeholder={t('editor.placeholder')}
-              value={draft}
-              onInput={(e) => setDraft(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) review();
-              }}
-              spellcheck
+              onChange={setDraft}
+              onReady={setEditor}
+              onSubmit={review}
+              class="min-h-[400px] p-4 text-[15px] leading-relaxed"
             />
             <div class="flex flex-wrap items-center gap-3 border-t border-line px-4 py-2">
-              <Button onClick={copy} disabled={!draft.trim()} icon={copied ? Check : Copy}>
+              <Button onClick={copy} disabled={!plain.trim()} icon={copied ? Check : Copy}>
                 {copied ? t('editor.copied') : t('editor.copy')}
               </Button>
-              {!draft && (
-                <button type="button" class="text-sm text-brand underline" onClick={() => { setDraft(EXAMPLES[lang]); editor.current?.focus(); }}>
+              {!plain.trim() && (
+                <button type="button" class="text-sm text-brand underline" onClick={() => { setEditorContent(EXAMPLES[lang]); editor?.commands.focus('end'); }}>
                   {t('editor.example')}
                 </button>
               )}
@@ -252,7 +269,10 @@ function Compare({
   useEffect(() => {
     if (!task.done) setEditing(false);
   }, [task.done]);
-  const parts = useMemo(() => (task.done ? diffWords(task.original, task.text) : null), [task.done, task.original, task.text]);
+  const parts = useMemo(
+    () => (task.done ? diffWords(markdownToPlain(task.original), markdownToPlain(task.text)) : null),
+    [task.done, task.original, task.text],
+  );
   const changes = parts && countChanges(parts);
 
   return (
@@ -261,7 +281,7 @@ function Compare({
         <div class="border-b border-line md:border-b-0 md:border-r">
           <PaneHeader title={t('editor.title')} hint={parts ? t('compare.removed') : undefined} />
           <div class="whitespace-pre-wrap p-4 text-[15px] leading-relaxed">
-            {parts ? <DiffText parts={parts} side="before" /> : task.original}
+            {parts ? <DiffText parts={parts} side="before" /> : markdownToPlain(task.original)}
           </div>
         </div>
         <div class="bg-brand-soft/30">
@@ -275,19 +295,16 @@ function Compare({
             }
           />
           {editing ? (
-            <textarea
-              class="block min-h-[300px] w-full resize-y bg-surface p-4 text-[15px] leading-relaxed outline-none ring-2 ring-inset ring-brand/40"
-              value={task.text}
-              onInput={(e) => onChange(e.currentTarget.value)}
-              autoFocus
-            />
+            <div class="bg-surface ring-2 ring-inset ring-brand/40">
+              <RichEditor initialMarkdown={task.text} onChange={onChange} autofocus class="min-h-[300px] p-4 text-[15px] leading-relaxed" />
+            </div>
           ) : (
             <div
               class={`min-h-[300px] whitespace-pre-wrap p-4 text-[15px] leading-relaxed ${parts ? 'cursor-text rounded-b-xl hover:bg-white/60' : ''}`}
               onClick={() => parts && setEditing(true)}
               title={parts ? t('compare.clickToEdit') : undefined}
             >
-              {parts ? <DiffText parts={parts} side="after" /> : <Streaming text={task.text} startedAt={task.startedAt} status={status} />}
+              {parts ? <DiffText parts={parts} side="after" /> : <Streaming text={markdownToPlain(task.text)} startedAt={task.startedAt} status={status} />}
             </div>
           )}
         </div>
@@ -432,9 +449,7 @@ function SensitiveBar({ matches, onSelect }: { matches: SensitiveMatch[]; onSele
     <div class="rounded-xl border border-brand/20 bg-surface px-4 py-3 text-sm shadow-card">
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span class="inline-flex items-center gap-2 font-medium text-ink">
-          <span class="flex h-7 w-7 items-center justify-center rounded-full bg-brand-soft text-brand">
-            <ShieldCheck size={16} aria-hidden="true" />
-          </span>
+          <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" class="h-7 w-7" />
           {t(matches.length === 1 ? 'sensitive.protectedOne' : 'sensitive.protectedMany', { n: matches.length })}
         </span>
         <span class="text-xs text-muted" title={t('sensitive.why')}>{t('sensitive.hint')}</span>
