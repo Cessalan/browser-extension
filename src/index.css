@@ -7,6 +7,7 @@
 @theme {
   --color-nav: #ffffff;
   --color-brand: #0278b8; /* lightest sky blue that keeps white text readable (WCAG AA) */
+  --color-brand-strong: #02679e;
   --color-brand-soft: #e0f2fe;
   --color-surface: #ffffff;
   --color-canvas: #f0f9ff;
@@ -16,6 +17,9 @@
   --color-good: #15803d;
   --color-warn: #b45309;
   --color-bad: #b91c1c;
+  /* Soft, tinted elevation: reads as calm and solid rather than flat or flashy. */
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(2 120 184 / 0.08);
+  --shadow-button: 0 1px 2px rgb(2 103 158 / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.12);
   --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 

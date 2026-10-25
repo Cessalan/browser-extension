@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { Brain, CircleCheck, CircleX, Copy, Check, Info, Mic, Star, TriangleAlert, Zap, type LucideIcon } from 'lucide-preact';
+import {
+  Brain, Check, ChevronRight, CircleCheck, CircleX, Copy, HardDrive, MemoryStick, Mic, Monitor, MonitorCheck, ShieldCheck, Sparkles,
+  Star, TriangleAlert, UserX, WifiOff, Zap, type LucideIcon,
+} from 'lucide-preact';
 import { Button, Card, ProgressBar, type Progress } from '../ui';
 import { useI18n, type Key } from '../i18n';
 import { ai } from '../ai/engine';
@@ -86,47 +89,66 @@ export function SpeedTest() {
   }
 
   return (
-    <div class="mx-auto max-w-3xl space-y-4">
+    <div class="mx-auto max-w-3xl space-y-5">
       <div>
-        <h2 class="text-xl font-semibold">{t('setup.title')}</h2>
-        <p class="text-sm text-muted">{t('setup.intro')}</p>
+        <h2 class="text-2xl font-semibold tracking-tight">{t('setup.title')}</h2>
+        <p class="mt-1 text-sm text-muted">{t('setup.intro')}</p>
       </div>
+
+      <PrivacyStrip />
 
       <ReadyBanner device={device} llm={llm} recommended={recommended} current={mode} onSwitch={chooseMode} />
 
       <Card title={t('setup.mode')}>
-        <div class="grid gap-2 sm:grid-cols-3">
+        <div role="radiogroup" aria-label={t('setup.mode')} class="space-y-2">
           {AI_MODES.map((m) => {
             const Icon = MODE_ICONS[m.mode];
             const selected = m.mode === mode;
             return (
               <button
                 type="button"
-                class={`flex h-full flex-col justify-start rounded-lg border p-3 text-left transition ${selected ? 'border-brand bg-brand-soft/60 ring-2 ring-brand/30' : 'border-line hover:border-brand/50 hover:bg-canvas'}`}
+                role="radio"
+                aria-checked={selected}
+                class={`group flex w-full items-start gap-3 rounded-xl border p-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
+                  selected ? 'border-brand bg-brand-soft/40' : 'border-line hover:border-brand/40 hover:bg-canvas/60'
+                }`}
                 onClick={() => chooseMode(m.mode)}
                 disabled={busy}
-                aria-pressed={selected}
               >
-                <div class="flex items-center gap-2 font-medium">
-                  <Icon size={16} class="text-brand" aria-hidden="true" />
-                  {t(`mode.${m.mode}` as Key)}
-                  {m.mode === recommended && (
-                    <span class="ml-auto whitespace-nowrap rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase text-white">{t('setup.recommended')}</span>
-                  )}
-                </div>
-                <p class="mt-1 text-xs text-muted">{t(`mode.${m.mode}.desc` as Key)}</p>
-                <p class="mt-auto pt-2 text-xs text-muted">{t('setup.download', { mb: m.downloadMB })}</p>
+                <span
+                  class={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${selected ? 'bg-brand text-white' : 'bg-brand-soft text-brand'}`}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                    <span class="font-semibold">{t(`mode.${m.mode}` as Key)}</span>
+                    {m.mode === recommended && (
+                      <span class="inline-flex items-center gap-1 text-xs font-medium text-brand">
+                        <Sparkles size={12} aria-hidden="true" /> {t('setup.recommended')}
+                      </span>
+                    )}
+                  </span>
+                  <span class="mt-0.5 block text-sm text-muted">{t(`mode.${m.mode}.desc` as Key)}</span>
+                </span>
+                <span class="hidden shrink-0 self-center text-xs text-muted sm:block">~{m.downloadMB} {t('setup.mb')}</span>
+                <span
+                  class={`mt-2.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border-2 ${selected ? 'border-brand' : 'border-line group-hover:border-brand/50'}`}
+                  aria-hidden="true"
+                >
+                  {selected && <span class="h-2 w-2 rounded-full bg-brand" />}
+                </span>
               </button>
             );
           })}
         </div>
-        <div class="mt-3 flex flex-wrap items-center gap-3">
+        <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
           <Button onClick={testLlm} disabled={busy || !device?.webgpu}>{t('setup.testMode')}</Button>
           <span class="text-xs text-muted">{chosen ? t('setup.modeSaved') : t('setup.autoPicked')}</span>
         </div>
         <ProgressBar progress={llmProgress} />
         {llm && (
-          <dl class="mt-3 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+          <dl class="mt-4 grid gap-3 sm:grid-cols-3">
             <Stat
               label={t('setup.writingSpeed')}
               value={t(`verdict.${llmVerdict(llm.tokensPerSecond)}` as Key)}
@@ -146,7 +168,7 @@ export function SpeedTest() {
         </div>
         <ProgressBar progress={sttProgress} />
         {stt && (
-          <dl class="mt-3 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+          <dl class="mt-4 grid gap-3 sm:grid-cols-3">
             <Stat
               label={t('setup.voiceSpeed')}
               value={t(`verdict.${sttVerdict(stt)}` as Key)}
@@ -157,13 +179,18 @@ export function SpeedTest() {
         )}
       </Card>
 
-      {error && <p class="rounded-md bg-red-50 p-3 text-sm text-bad">{error}</p>}
+      {error && <p class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-bad">{error}</p>}
 
       {device && (
-        <details class="rounded-lg border border-line bg-surface p-4 text-sm">
-          <summary class="cursor-pointer font-medium text-muted">{t('setup.technical')}</summary>
+        <details class="group rounded-xl border border-line bg-surface/70 px-5 py-4 text-sm">
+          <summary class="cursor-pointer list-none font-medium text-muted marker:hidden">
+            <span class="inline-flex items-center gap-2">
+              <ChevronRight size={16} class="transition-transform group-open:rotate-90" aria-hidden="true" />
+              {t('setup.technical')}
+            </span>
+          </summary>
           <p class="mt-2 text-xs text-muted">{t('setup.technicalHint')}</p>
-          <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+          <dl class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Stat label="WebGPU" value={device.webgpu ? 'yes' : 'no'} />
             <Stat label="GPU" value={device.gpu ?? '-'} />
             <Stat label="shader-f16" value={device.shaderF16 ? 'yes' : 'no'} />
@@ -173,9 +200,9 @@ export function SpeedTest() {
             {llm && <Stat label="Decode" value={`${llm.tokensPerSecond.toFixed(1)} tok/s (${llm.mode})`} />}
             <Stat label="Memory (reported)" value={device.memoryGB != null ? `${device.memoryGB} GB` : '?'} />
           </dl>
-          {llm?.output && <pre class="mt-3 whitespace-pre-wrap rounded-md bg-canvas p-2 text-xs">{llm.output}</pre>}
-          {stt?.text && <p class="mt-2 rounded-md bg-canvas p-2 text-xs">“{stt.text}”</p>}
-          <div class="mt-3">
+          {llm?.output && <pre class="mt-3 whitespace-pre-wrap rounded-lg bg-canvas p-3 text-xs">{llm.output}</pre>}
+          {stt?.text && <p class="mt-2 rounded-lg bg-canvas p-3 text-xs">“{stt.text}”</p>}
+          <div class="mt-4">
             <Button onClick={copyReport} variant="secondary" icon={copied ? Check : Copy}>
               {copied ? t('editor.copied') : t('setup.copy')}
             </Button>
@@ -188,6 +215,26 @@ export function SpeedTest() {
 
 function progressText(t: (k: Key, p?: Record<string, string | number>) => string, fraction: number) {
   return fraction >= 1 ? t('setup.almostReady') : t('setup.downloading', { pct: Math.round(fraction * 100) });
+}
+
+/** Three quiet promises, shown up front because trust is the point of Confi. */
+function PrivacyStrip() {
+  const { t } = useI18n();
+  const items: [LucideIcon, Key][] = [
+    [ShieldCheck, 'trust.local'],
+    [WifiOff, 'trust.offline'],
+    [UserX, 'trust.noAccount'],
+  ];
+  return (
+    <ul class="grid gap-2 sm:grid-cols-3">
+      {items.map(([Icon, key]) => (
+        <li class="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm shadow-card">
+          <Icon size={17} class="shrink-0 text-brand" aria-hidden="true" />
+          <span>{t(key)}</span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /** One plain-language answer to "can I use Confi on this computer?" */
@@ -215,51 +262,60 @@ function ReadyBanner({
     const v = llmVerdict(llm.tokensPerSecond);
     [tone, title] = v === 'good' ? ['good', 'setup.ready'] : v === 'ok' ? ['warn', 'setup.okSlow'] : ['bad', 'setup.slow'];
   } else if (device) {
-    [tone, title, hint] = ['info', 'setup.runTest', null];
+    [tone, title, hint] = ['info', 'setup.runTestTitle', 'setup.runTest'];
   }
 
   const style = {
-    good: ['border-green-200 bg-green-50 text-good', CircleCheck],
-    warn: ['border-amber-200 bg-amber-50 text-warn', TriangleAlert],
-    bad: ['border-red-200 bg-red-50 text-bad', CircleX],
-    info: ['border-line bg-surface text-ink', Info],
+    good: ['bg-green-50 text-good ring-green-200', CircleCheck],
+    warn: ['bg-amber-50 text-warn ring-amber-200', TriangleAlert],
+    bad: ['bg-red-50 text-bad ring-red-200', CircleX],
+    info: ['bg-brand-soft text-brand ring-brand/20', MonitorCheck],
   } as const;
-  const [classes, Icon] = style[tone];
+  const [badge, Icon] = style[tone];
+  const heavierThanFit = recommended != null && MODE_ORDER.indexOf(current) > MODE_ORDER.indexOf(recommended);
 
   return (
-    <div class={`flex gap-3 rounded-lg border p-4 ${classes}`}>
-      <Icon size={22} class="shrink-0" aria-hidden="true" />
-      <div>
-        <p class="font-medium">{t(title)}</p>
-        {hint && <p class="mt-0.5 text-sm text-ink/80">{t(hint)}</p>}
-        {device?.webgpu && recommended && recommended !== current && !llm && MODE_ORDER.indexOf(current) > MODE_ORDER.indexOf(recommended) ? (
-          <p class="mt-1 text-sm text-ink/80">{t('setup.testFirst')}</p>
-        ) : device?.webgpu && recommended && recommended !== current && (
-          <div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink">
-            <span>{t('setup.suggest', { mode: t(`mode.${recommended}` as Key) })}</span>
-            <Button variant="secondary" onClick={() => onSwitch(recommended)}>
-              {t('setup.switchTo', { mode: t(`mode.${recommended}` as Key) })}
-            </Button>
-          </div>
-        )}
-        {device && (
-          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-            <Fact ok={device.webgpu && !isSoftwareGpu(device)}>{t('setup.graphics')}</Fact>
-            {device.memoryGB != null && <Fact ok={device.memoryGB >= 8}>{t('setup.memory', { gb: device.memoryGB })}</Fact>}
-            {device.storageFreeGB != null && <Fact ok={device.storageFreeGB >= 3}>{t('setup.space', { gb: device.storageFreeGB })}</Fact>}
-          </div>
-        )}
+    <section class="rounded-xl border border-line bg-surface p-5 shadow-card">
+      <div class="flex gap-4">
+        <span class={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ring-1 ${badge}`}>
+          <Icon size={22} aria-hidden="true" />
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="text-base font-semibold tracking-tight">{t(title)}</p>
+          {hint && <p class="mt-0.5 text-sm text-muted">{t(hint)}</p>}
+          {device?.webgpu && recommended && recommended !== current && (
+            !llm && heavierThanFit ? (
+              <p class="mt-2 text-sm text-muted">{t('setup.testFirst')}</p>
+            ) : (
+              <div class="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-canvas px-3 py-2 text-sm">
+                <Sparkles size={15} class="text-brand" aria-hidden="true" />
+                <span>{t('setup.suggest', { mode: t(`mode.${recommended}` as Key) })}</span>
+                <Button variant="secondary" onClick={() => onSwitch(recommended)}>
+                  {t('setup.switchTo', { mode: t(`mode.${recommended}` as Key) })}
+                </Button>
+              </div>
+            )
+          )}
+        </div>
       </div>
-    </div>
+      {device && (
+        <ul class="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 text-sm text-muted">
+          <Fact ok={device.webgpu && !isSoftwareGpu(device)} icon={Monitor}>{t('setup.graphics')}</Fact>
+          {device.memoryGB != null && <Fact ok={device.memoryGB >= 8} icon={MemoryStick}>{t('setup.memory', { gb: device.memoryGB })}</Fact>}
+          {device.storageFreeGB != null && <Fact ok={device.storageFreeGB >= 3} icon={HardDrive}>{t('setup.space', { gb: device.storageFreeGB })}</Fact>}
+        </ul>
+      )}
+    </section>
   );
 }
 
-function Fact({ ok, children }: { ok: boolean; children: ComponentChildren }) {
+function Fact({ ok, icon: Icon, children }: { ok: boolean; icon: LucideIcon; children: ComponentChildren }) {
   return (
-    <span class="inline-flex items-center gap-1">
-      {ok ? <CircleCheck size={13} class="text-good" aria-hidden="true" /> : <TriangleAlert size={13} class="text-warn" aria-hidden="true" />}
-      {children}
-    </span>
+    <li class="inline-flex items-center gap-2">
+      <Icon size={15} aria-hidden="true" />
+      <span class="text-ink">{children}</span>
+      {ok ? <CircleCheck size={14} class="text-good" aria-label="OK" /> : <TriangleAlert size={14} class="text-warn" aria-label="!" />}
+    </li>
   );
 }
 
@@ -271,7 +327,7 @@ const VERDICT_STYLE: Record<Verdict, string> = {
 
 function Stat({ label, value, sub, verdict }: { label: string; value: string; sub?: string; verdict?: Verdict }) {
   return (
-    <div class="min-w-0">
+    <div class="min-w-0 rounded-lg bg-canvas/70 px-3 py-2.5">
       <dt class="text-xs text-muted">{label}</dt>
       <dd class={`truncate font-medium ${verdict ? VERDICT_STYLE[verdict] : ''}`} title={value}>
         {value}

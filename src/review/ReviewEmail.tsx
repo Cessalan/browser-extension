@@ -151,7 +151,7 @@ export function ReviewEmail() {
   return (
     <div class="space-y-4">
       {/* Toolbar */}
-      <div class="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-2 shadow-sm">
+      <div class="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2.5 shadow-card">
         <Button onClick={review} disabled={!canAct} title="Ctrl + Enter" icon={ClipboardCheck}>
           {t('review.check')}
         </Button>
@@ -187,7 +187,7 @@ export function ReviewEmail() {
         />
       ) : (
         <div class={`grid items-start gap-4 ${task ? 'lg:grid-cols-[minmax(0,1fr)_340px]' : ''}`}>
-          <section class="rounded-lg border border-line bg-surface shadow-sm">
+          <section class="rounded-xl border border-line bg-surface shadow-card">
             <div class="flex items-center gap-2 border-b border-line px-4 py-2">
               <h3 class="font-medium">{t('editor.title')}</h3>
               <span class="text-xs text-muted">{t('editor.words', { n: words })}</span>
@@ -259,7 +259,7 @@ function Compare({
   const changes = parts && countChanges(parts);
 
   return (
-    <section class="rounded-lg border border-line bg-surface shadow-sm">
+    <section class="rounded-xl border border-line bg-surface shadow-card">
       <div class="grid md:grid-cols-2">
         <div class="border-b border-line md:border-b-0 md:border-r">
           <PaneHeader title={t('editor.title')} hint={parts ? t('compare.removed') : undefined} />
@@ -286,7 +286,7 @@ function Compare({
       <div class="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3">
         {task.done ? (
           <>
-            <Button onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
+            <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
             <Button variant="secondary" onClick={() => setEditing(!editing)} icon={Pencil}>{editing ? t('compare.showChanges') : t('compare.edit')}</Button>
             <Button variant="secondary" onClick={onRetry} icon={RotateCcw}>{t('compare.retry')}</Button>
             <Button variant="ghost" onClick={onDiscard} title="Esc">{t('compare.keepMine')}</Button>
@@ -298,8 +298,8 @@ function Compare({
           </>
         ) : (
           <>
-            <Button variant="secondary" onClick={() => void ai.stop()} icon={Square}>{t('compare.stop')}</Button>
-            <Button variant="ghost" onClick={() => { void ai.stop(); onDiscard(); }}>{t('compare.cancel')}</Button>
+            <Button key="stop" variant="secondary" onClick={() => void ai.stop()} icon={Square}>{t('compare.stop')}</Button>
+            <Button key="cancel" variant="ghost" onClick={() => { void ai.stop(); onDiscard(); }}>{t('compare.cancel')}</Button>
           </>
         )}
       </div>
@@ -378,7 +378,7 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
   const items = parseBullets(task.text);
   const seconds = useElapsed(task.startedAt);
   return (
-    <section class="rounded-lg border border-line bg-surface shadow-sm">
+    <section class="rounded-xl border border-line bg-surface shadow-card">
       <div class="flex items-center gap-2 border-b border-line px-4 py-2">
         <h3 class="font-medium">{t('check.title')}</h3>
         <button type="button" class="ml-auto text-muted hover:text-ink" onClick={onClose} aria-label={t('check.close')}>
@@ -419,7 +419,7 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
 function SensitiveBar({ matches, onSelect }: { matches: SensitiveMatch[]; onSelect: (m: SensitiveMatch) => void }) {
   const { lang, t } = useI18n();
   return (
-    <div class="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm">
+    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm">
       <span class="inline-flex items-center gap-1.5 font-medium text-warn">
         <ShieldAlert size={16} aria-hidden="true" /> {t('sensitive.title')}
       </span>
