@@ -4,9 +4,8 @@ export type Lang = 'en' | 'fr';
 
 const en = {
   // App shell
-  'nav.review': 'Review email',
+  'nav.back': 'Back to email',
   'nav.setup': 'Setup',
-  'app.private': 'Runs on this computer only',
   'app.switchLang': 'Français',
   'app.version': 'Version {v}',
   'update.available': 'A new version is available.',
@@ -137,9 +136,8 @@ const en = {
 export type Key = keyof typeof en;
 
 const fr: Record<Key, string> = {
-  'nav.review': 'Réviser un courriel',
+  'nav.back': 'Retour au courriel',
   'nav.setup': 'Configuration',
-  'app.private': 'Fonctionne sur cet ordinateur seulement',
   'app.switchLang': 'English',
   'app.version': 'Version {v}',
   'update.available': 'Une nouvelle version est disponible.',
