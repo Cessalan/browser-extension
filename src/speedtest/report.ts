@@ -21,7 +21,7 @@ export function sttVerdict(r: Pick<SttResult, 'audioSeconds' | 'transcribeSecond
 
 export function formatReport(device: DeviceInfo, llm?: LlmResult, stt?: SttResult): string {
   const lines = [
-    'Liaison Assistant: device speed test',
+    'Confi: device speed test',
     `Date: ${new Date().toISOString()}`,
     `Browser: ${device.browser}`,
     `CPU cores: ${device.cores ?? '?'} | RAM: ${device.memoryGB ?? '?'} GB | Free storage: ${device.storageFreeGB ?? '?'} GB`,

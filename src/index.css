@@ -1,23 +1,44 @@
 @import 'tailwindcss';
 
 /*
-  Design tokens. Re-skin the whole app to match the nurses' existing software
+  Design tokens. Re-skin the whole app to match the users' existing software
   by changing only these values.
 */
 @theme {
-  --color-brand: #0f766e;
-  --color-brand-soft: #ccfbf1;
+  --color-nav: #ffffff;
+  --color-brand: #0278b8; /* lightest sky blue that keeps white text readable (WCAG AA) */
+  --color-brand-strong: #02679e;
+  --color-brand-soft: #e0f2fe;
   --color-surface: #ffffff;
-  --color-canvas: #f8fafc;
+  --color-canvas: #f0f9ff;
   --color-ink: #0f172a;
   --color-muted: #64748b;
-  --color-line: #e2e8f0;
+  --color-line: #dbe7f3;
   --color-good: #15803d;
   --color-warn: #b45309;
   --color-bad: #b91c1c;
+  /* Soft, tinted elevation: reads as calm and solid rather than flat or flashy. */
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(2 120 184 / 0.08);
+  --shadow-button: 0 1px 2px rgb(2 103 158 / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.12);
   --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 body {
   @apply bg-canvas text-ink font-sans antialiased;
+}
+
+/* Rich text in the email editor: should look like a real email. */
+.confi-editor p { margin: 0 0 0.75em; }
+.confi-editor p:last-child { margin-bottom: 0; }
+.confi-editor ul { list-style: disc; padding-left: 1.5em; margin: 0 0 0.75em; }
+.confi-editor ol { list-style: decimal; padding-left: 1.5em; margin: 0 0 0.75em; }
+.confi-editor li p { margin: 0; }
+.confi-editor mark { background: #fef08a; color: inherit; border-radius: 2px; padding: 0 1px; }
+.confi-editor a { color: var(--color-brand); text-decoration: underline; }
+.confi-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chatOptions, fallbackModelId, resolveModelId } from './models';
+import { AI_MODES, chatOptions, extraBody, fallbackModelId, modeInfo, resolveModelId } from './models';
 
 describe('models', () => {
   it('turns off the sliding window for Gemma 3 only', () => {
@@ -11,5 +11,15 @@ describe('models', () => {
     expect(resolveModelId('gemma3-1b-it-q4f16_1-MLC', false)).toBe('Llama-3.2-1B-Instruct-q4f32_1-MLC');
     expect(fallbackModelId(false)).toContain('q4f32');
     expect(fallbackModelId(true)).toContain('q4f16');
+  });
+
+  it('maps every AI mode to a model with a 32-bit fallback', () => {
+    for (const { modelId } of AI_MODES) expect(resolveModelId(modelId, false)).toContain('q4f32');
+    expect(modeInfo('standard').modelId).toContain('gemma3');
+  });
+
+  it('turns off Qwen 3 thinking only', () => {
+    expect(extraBody('Qwen3-0.6B-q4f16_1-MLC')).toEqual({ enable_thinking: false });
+    expect(extraBody('gemma3-1b-it-q4f16_1-MLC')).toBeUndefined();
   });
 });

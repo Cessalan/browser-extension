@@ -1,6 +1,6 @@
-# Liaison Assistant
+# Confi
 
-Private, on-device assistant for liaison nurses: review emails, dictate notes, organize thoughts.
+Private, on-device writing assistant for anyone who reviews and corrects text containing sensitive data (patients, clients, employees): emails, notes, reports.
 All AI runs **in the browser on the user's computer**. No server, nothing is uploaded.
 
 Current stage: **device speed test**. It checks whether a computer can run the local AI models.

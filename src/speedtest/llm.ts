@@ -1,5 +1,5 @@
 import { CreateWebWorkerMLCEngine, hasModelInCache } from '@mlc-ai/web-llm';
-import { chatOptions } from './models';
+import { chatOptions, extraBody } from './models';
 
 // Made-up example. Never put real patient data in test prompts.
 export const SAMPLE_EMAIL = `Hi Dr. Smith,
@@ -36,12 +36,12 @@ export async function runLlmTest(
     onProgress(1, 'Running test prompt…');
     const reply = await engine.chat.completions.create({
       messages: [
-        { role: 'system', content: 'You review emails written by a hospital liaison nurse. Reply with 3 short bullet points: what is unclear, what is missing, and one suggested fix.' },
+        { role: 'system', content: 'You review a short professional email. Reply with 3 short bullet points: what is unclear, what is missing, and one suggested fix.' },
         { role: 'user', content: SAMPLE_EMAIL },
       ],
       max_tokens: 160,
       temperature: 0.3,
-      extra_body: modelId.startsWith('Qwen3') ? { enable_thinking: false } : undefined,
+      extra_body: extraBody(modelId),
     });
     const extra = reply.usage?.extra;
     await engine.unload();
