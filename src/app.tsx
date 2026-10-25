@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { ReviewEmail } from './review/ReviewEmail';
 import { SpeedTest } from './speedtest/SpeedTest';
+import { Landing } from './landing/Landing';
 import { setLang, useI18n } from './i18n';
 import { ArrowLeft, Languages, RefreshCw, Settings2 } from 'lucide-preact';
 import { useRegisterSW } from 'virtual:pwa-register/preact';
@@ -11,6 +12,19 @@ const PAGES: Record<string, () => preact.JSX.Element> = {
   '#/setup': SpeedTest,
   '#/speed-test': SpeedTest, // old address of Setup
 };
+
+const ONBOARDED_KEY = 'onboarded';
+
+function isOnboarded() {
+  try {
+    return localStorage.getItem(ONBOARDED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+// First visit: start on the landing page, which explains Confi and sets it up.
+if (!isOnboarded() && (location.hash === '' || location.hash === '#/')) location.replace('#/welcome');
 
 function useHash() {
   const [hash, setHash] = useState(location.hash || '#/');
@@ -26,9 +40,22 @@ export function App() {
   const hash = useHash();
   const { lang, t } = useI18n();
   const onSetup = PAGES[hash] === SpeedTest;
+  const onLanding = hash === '#/welcome';
+
+  function openApp() {
+    try {
+      localStorage.setItem(ONBOARDED_KEY, '1');
+    } catch {
+      // Not critical: the landing page will just show again next time.
+    }
+    location.hash = '#/';
+    scrollTo(0, 0);
+  }
 
   return (
     <div class="min-h-screen">
+      {onLanding && <Landing onOpen={openApp} />}
+      <div hidden={onLanding}>
       <header class="border-b border-line bg-nav text-ink">
         <div class="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
           <a href="#/" class="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
@@ -69,7 +96,11 @@ export function App() {
         </div>
         {onSetup && <SpeedTest />}
       </main>
-      <footer class="mx-auto max-w-5xl px-4 pb-6 text-xs text-muted">{t('app.version', { v: __APP_VERSION__ })}</footer>
+      <footer class="mx-auto flex max-w-5xl gap-4 px-4 pb-6 text-xs text-muted">
+        <span>{t('app.version', { v: __APP_VERSION__ })}</span>
+        <a href="#/welcome" class="hover:text-ink">{t('land.about')}</a>
+      </footer>
+      </div>
     </div>
   );
 }
