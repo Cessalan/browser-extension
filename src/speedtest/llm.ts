@@ -1,4 +1,5 @@
 import { CreateWebWorkerMLCEngine, hasModelInCache } from '@mlc-ai/web-llm';
+import { chatOptions } from './models';
 
 // Made-up example. Never put real patient data in test prompts.
 export const SAMPLE_EMAIL = `Hi Dr. Smith,
@@ -24,9 +25,12 @@ export async function runLlmTest(
 
   try {
     const t0 = performance.now();
-    const engine = await CreateWebWorkerMLCEngine(worker, modelId, {
-      initProgressCallback: (p) => onProgress(p.progress, p.text),
-    });
+    const engine = await CreateWebWorkerMLCEngine(
+      worker,
+      modelId,
+      { initProgressCallback: (p) => onProgress(p.progress, p.text) },
+      chatOptions(modelId),
+    );
     const loadSeconds = (performance.now() - t0) / 1000;
 
     onProgress(1, 'Running test prompt…');

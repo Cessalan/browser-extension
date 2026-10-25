@@ -22,4 +22,18 @@ export function resolveModelId(id: string, shaderF16: boolean): string {
   return shaderF16 ? id : (F32_FALLBACK[id] ?? id);
 }
 
+/** Used automatically if the chosen model fails to start. */
+export function fallbackModelId(shaderF16: boolean): string {
+  return shaderF16 ? 'Llama-3.2-1B-Instruct-q4f16_1-MLC' : 'Llama-3.2-1B-Instruct-q4f32_1-MLC';
+}
+
+/**
+ * Per-model runtime settings. Gemma 3's published config sets both a context window and a
+ * sliding window, which WebLLM rejects ("Only one of context_window_size and
+ * sliding_window_size can be positive"), so turn the sliding window off.
+ */
+export function chatOptions(modelId: string): { sliding_window_size?: number } | undefined {
+  return modelId.startsWith('gemma3') ? { sliding_window_size: -1 } : undefined;
+}
+
 export const SPEECH_MODEL = 'onnx-community/moonshine-tiny-ONNX';
