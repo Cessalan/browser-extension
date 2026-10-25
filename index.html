@@ -16,9 +16,81 @@
     <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#ffffff" />
-    <title>Confi</title>
+    <title>Confi: private AI writing assistant for confidential text</title>
+    <meta
+      name="description"
+      content="Review, correct and format emails, notes and reports with an AI that runs entirely on your computer. Made for text about patients, clients or employees. No account, works offline, English and French."
+    />
+    <!-- %SITE_URL% is filled in by vite.config.ts (the deployed address). -->
+    <link rel="canonical" href="%SITE_URL%" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Confi" />
+    <meta property="og:url" content="%SITE_URL%" />
+    <meta property="og:title" content="Confi: polish sensitive text without it leaving your computer" />
+    <meta property="og:description" content="An AI writing assistant that runs in your browser, on your computer. Your emails, notes and reports are never sent online." />
+    <meta property="og:image" content="%SITE_URL%social.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_CA" />
+    <meta property="og:locale:alternate" content="fr_CA" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Confi",
+        "url": "%SITE_URL%",
+        "image": "%SITE_URL%social.png",
+        "description": "Private, on-device AI writing assistant that reviews, corrects and formats emails, notes and reports containing confidential information. The AI runs in the browser; text is never sent to a server.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Windows, macOS, ChromeOS",
+        "browserRequirements": "Requires an up-to-date Chrome or Edge with WebGPU",
+        "inLanguage": ["en", "fr"],
+        "featureList": [
+          "Check and rewrite text: clearer, shorter, more professional",
+          "Spelling and grammar correction in English and French",
+          "Flags confidential details such as file numbers, dates of birth and phone numbers",
+          "On-device voice typing",
+          "Works offline after a one-time download, no account"
+        ]
+      }
+    </script>
   </head>
   <body>
+    <!--
+      What search engines and link previews read before the app starts (main.tsx removes it).
+      Keep it in step with the landing page copy, and keep every claim factual.
+    -->
+    <main id="seo" style="max-width: 46rem; margin: 0 auto; padding: 3rem 1rem; font-family: system-ui, sans-serif; color: #0f172a; line-height: 1.6">
+      <h1>Confi: polish sensitive text without it ever leaving your computer</h1>
+      <p>
+        Confi reviews, corrects and formats your emails, notes and reports with an AI that runs entirely on your
+        computer. Made for text about patients, clients or employees. Nothing is ever sent online.
+      </p>
+      <h2>What it does</h2>
+      <ul>
+        <li>Checks your text and suggests what to fix, or rewrites it clearer, shorter or more professional.</li>
+        <li>Corrects spelling and grammar, and keeps your text in the language you wrote it in: English or French.</li>
+        <li>Spots file numbers, social insurance and health insurance numbers, dates of birth, phone numbers and email addresses before you share.</li>
+        <li>Lets you dictate your text by voice, transcribed on your computer.</li>
+      </ul>
+      <h2>Who it is for</h2>
+      <p>
+        Healthcare (liaison notes, referrals, emails to physicians), legal (client letters, case notes), human resources
+        (employee files, feedback) and social services (case reports, client files).
+      </p>
+      <h2>Private by design</h2>
+      <p>
+        Confi downloads its AI once, then runs it right in your browser. Your text is never sent to a server. No account,
+        no cookies, no analytics, and it works offline after the first setup.
+      </p>
+      <h2 lang="fr">En français</h2>
+      <p lang="fr">
+        Confi révise, corrige et met en forme vos courriels, notes et rapports avec une IA qui fonctionne entièrement sur
+        votre ordinateur. Conçu pour les textes sur des patients, des clients ou des employés. Rien n’est envoyé en ligne.
+      </p>
+      <noscript><p>Confi needs JavaScript and an up-to-date Chrome or Edge.</p></noscript>
+    </main>
     <div id="app"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

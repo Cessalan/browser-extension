@@ -8,10 +8,15 @@ import pkg from './package.json' with { type: 'json' };
 const version = `${pkg.version}${process.env.GITHUB_SHA ? `+${process.env.GITHUB_SHA.slice(0, 7)}` : '-dev'}`;
 
 // BASE_PATH is set by the GitHub Pages workflow (e.g. "/browser-extension/").
+const base = process.env.BASE_PATH ?? '/';
+// The public address, for canonical and social-preview links (they must be absolute).
+const siteUrl = process.env.SITE_URL ?? `https://cessalan.github.io${base}`;
+
 export default defineConfig({
-  base: process.env.BASE_PATH ?? '/',
+  base,
   define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
+    { name: 'site-url', transformIndexHtml: (html) => html.replaceAll('%SITE_URL%', siteUrl) },
     preact(),
     tailwindcss(),
     VitePWA({
@@ -24,6 +29,8 @@ export default defineConfig({
         theme_color: '#ffffff',
         background_color: '#f0f9ff',
         display: 'standalone',
+        lang: 'en',
+        categories: ['productivity', 'business', 'utilities'],
         icons: [
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' },
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
