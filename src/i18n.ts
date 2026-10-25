@@ -6,20 +6,20 @@ const en = {
   // App shell
   'nav.review': 'Review email',
   'nav.speedTest': 'Speed test',
-  'app.private': '🔒 Runs on this computer only',
+  'app.private': 'Runs on this computer only',
   'app.switchLang': 'Français',
 
   // AI status
   'ai.ready': 'AI ready · on this computer',
   'ai.starting': 'AI starting {pct}%',
   'ai.retry': "AI couldn't start · Retry",
-  'ai.download': '⬇ Download AI (~700 MB, once)',
+  'ai.download': 'Download AI (~700 MB, once)',
   'ai.checking': 'Checking AI…',
   'ai.startingLong': 'Starting the AI… {pct}%',
   'ai.firstTimeOnly': 'First time only. After this it starts in seconds.',
 
   // Review: toolbar
-  'review.check': '✓ Check my email',
+  'review.check': 'Check my email',
   'review.rewrite': 'Rewrite',
   'rewrite.clearer': 'Clearer',
   'rewrite.professional': 'More professional',
@@ -32,18 +32,18 @@ const en = {
   // Review: editor
   'editor.title': 'Your email',
   'editor.words': '{n} words',
-  'editor.undo': '↶ Undo',
+  'editor.undo': 'Undo',
   'editor.undoTitle': 'Undo last change',
   'editor.clear': 'Clear',
   'editor.placeholder': 'Paste or type your email here…',
   'editor.copy': 'Copy to send',
-  'editor.copied': 'Copied ✓',
+  'editor.copied': 'Copied',
   'editor.example': 'Try with an example',
   'editor.notSaved': 'Not saved. Closing the tab clears it.',
 
   // Review: compare
   'compare.removed': 'Removed text in red',
-  'compare.added': 'Added text in green',
+  'compare.added': 'Added text in blue',
   'compare.suggestion': 'Suggestion: {label}',
   'compare.use': 'Use this version',
   'compare.edit': 'Edit',
@@ -63,7 +63,7 @@ const en = {
   'check.close': 'Close',
 
   // Sensitive info
-  'sensitive.title': '⚠ Patient details found',
+  'sensitive.title': 'Patient details found',
   'sensitive.hint': 'Send through secure email, or remove them:',
   'kind.ssn': 'SSN',
   'kind.nam': 'Health insurance no.',
@@ -103,7 +103,7 @@ const en = {
   'speed.transcribeValue': '{t} s for {a} s audio',
   'speed.load': 'Load',
   'speed.copy': 'Copy results',
-  'speed.copied': 'Copied ✓',
+  'speed.copied': 'Copied',
   'speed.copyHint': 'Paste the results to share them. They contain only device specs and speeds.',
   'speed.starting': 'Starting…',
 };
@@ -113,18 +113,18 @@ export type Key = keyof typeof en;
 const fr: Record<Key, string> = {
   'nav.review': 'Réviser un courriel',
   'nav.speedTest': 'Test de vitesse',
-  'app.private': '🔒 Fonctionne sur cet ordinateur seulement',
+  'app.private': 'Fonctionne sur cet ordinateur seulement',
   'app.switchLang': 'English',
 
   'ai.ready': 'IA prête · sur cet ordinateur',
   'ai.starting': "Démarrage de l'IA {pct} %",
   'ai.retry': "L'IA n'a pas démarré · Réessayer",
-  'ai.download': "⬇ Télécharger l'IA (~700 Mo, une fois)",
+  'ai.download': "Télécharger l'IA (~700 Mo, une fois)",
   'ai.checking': "Vérification de l'IA…",
   'ai.startingLong': "Démarrage de l'IA… {pct} %",
   'ai.firstTimeOnly': 'La première fois seulement. Ensuite, elle démarre en quelques secondes.',
 
-  'review.check': '✓ Vérifier mon courriel',
+  'review.check': 'Vérifier mon courriel',
   'review.rewrite': 'Réécrire',
   'rewrite.clearer': 'Plus clair',
   'rewrite.professional': 'Plus professionnel',
@@ -136,17 +136,17 @@ const fr: Record<Key, string> = {
 
   'editor.title': 'Votre courriel',
   'editor.words': '{n} mots',
-  'editor.undo': '↶ Annuler',
+  'editor.undo': 'Annuler',
   'editor.undoTitle': 'Annuler la dernière modification',
   'editor.clear': 'Effacer',
   'editor.placeholder': 'Collez ou écrivez votre courriel ici…',
   'editor.copy': 'Copier pour envoyer',
-  'editor.copied': 'Copié ✓',
+  'editor.copied': 'Copié',
   'editor.example': 'Essayer avec un exemple',
   'editor.notSaved': "Rien n'est enregistré. Fermer l'onglet efface tout.",
 
   'compare.removed': 'Texte retiré en rouge',
-  'compare.added': 'Texte ajouté en vert',
+  'compare.added': 'Texte ajouté en bleu',
   'compare.suggestion': 'Suggestion : {label}',
   'compare.use': 'Utiliser cette version',
   'compare.edit': 'Modifier',
@@ -164,7 +164,7 @@ const fr: Record<Key, string> = {
   'check.stale': 'Vous avez modifié le courriel depuis cette vérification.',
   'check.close': 'Fermer',
 
-  'sensitive.title': '⚠ Renseignements sur le patient détectés',
+  'sensitive.title': 'Renseignements sur le patient détectés',
   'sensitive.hint': 'Envoyez par courriel sécurisé ou retirez-les :',
   'kind.ssn': 'NAS',
   'kind.nam': "N° d'assurance maladie",
@@ -203,7 +203,7 @@ const fr: Record<Key, string> = {
   'speed.transcribeValue': '{t} s pour {a} s d’audio',
   'speed.load': 'Chargement',
   'speed.copy': 'Copier les résultats',
-  'speed.copied': 'Copié ✓',
+  'speed.copied': 'Copié',
   'speed.copyHint': 'Collez les résultats pour les partager. Ils contiennent seulement les specs et les vitesses.',
   'speed.starting': 'Démarrage…',
 };

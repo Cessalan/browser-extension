@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
 import { ai, useAiStatus, type AiStatus, type Message } from '../ai/engine';
 import { Button } from '../ui';
 import { useI18n, type Lang } from '../i18n';
+import {
+  Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle, Pencil, RotateCcw,
+  Scissors, ShieldAlert, Sparkles, SpellCheck, Square, Undo2, X, type LucideIcon,
+} from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
-import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, rewriteMessages } from './prompts';
+import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, rewriteMessages, type RewriteId } from './prompts';
+
+const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
 import { countChanges, diffWords, type DiffPart } from './diff';
 
 // Made-up examples. Never use real patient data here.
@@ -91,20 +98,18 @@ export function ReviewEmail() {
     <div class="space-y-4">
       {/* Toolbar */}
       <div class="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-2 shadow-sm">
-        <Button onClick={review} disabled={!canAct} title="Ctrl + Enter">
+        <Button onClick={review} disabled={!canAct} title="Ctrl + Enter" icon={ClipboardCheck}>
           {t('review.check')}
         </Button>
         <span class="mx-1 hidden h-6 w-px bg-line sm:block" />
         <span class="px-1 text-xs font-medium uppercase tracking-wide text-muted">{t('review.rewrite')}</span>
         {REWRITES.map((r) => (
-          <Button key={r.id} variant="secondary" onClick={() => rewrite(t(r.label), draft, rewriteMessages(r.id, draft))} disabled={!canAct}>
+          <Button key={r.id} variant="secondary" icon={REWRITE_ICONS[r.id]} onClick={() => rewrite(t(r.label), draft, rewriteMessages(r.id, draft))} disabled={!canAct}>
             {t(r.label)}
           </Button>
         ))}
-        <div class="ml-auto">
-          <AiPill status={status} />
-        </div>
         <InstructionBox
+          trailing={<AiPill status={status} />}
           value={instruction}
           onInput={setInstruction}
           onSubmit={applyInstruction}
@@ -134,10 +139,10 @@ export function ReviewEmail() {
               <h3 class="font-medium">{t('editor.title')}</h3>
               <span class="text-xs text-muted">{t('editor.words', { n: words })}</span>
               <div class="ml-auto flex gap-1">
-                <Button variant="ghost" onClick={() => { setDraft(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')}>
+                <Button variant="ghost" onClick={() => { setDraft(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
                   {t('editor.undo')}
                 </Button>
-                <Button variant="ghost" onClick={() => { replaceDraft(''); setTask(null); }} disabled={!draft}>
+                <Button variant="ghost" onClick={() => { replaceDraft(''); setTask(null); }} disabled={!draft} icon={Eraser}>
                   {t('editor.clear')}
                 </Button>
               </div>
@@ -154,7 +159,7 @@ export function ReviewEmail() {
               spellcheck
             />
             <div class="flex flex-wrap items-center gap-3 border-t border-line px-4 py-2">
-              <Button onClick={copy} disabled={!draft.trim()}>
+              <Button onClick={copy} disabled={!draft.trim()} icon={copied ? Check : Copy}>
                 {copied ? t('editor.copied') : t('editor.copy')}
               </Button>
               {!draft && (
@@ -226,13 +231,13 @@ function Compare({
       <div class="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3">
         {task.done ? (
           <>
-            <Button onClick={onUse}>{t('compare.use')}</Button>
-            <Button variant="secondary" onClick={() => setEditing(!editing)}>{editing ? t('compare.showChanges') : t('compare.edit')}</Button>
-            <Button variant="secondary" onClick={onRetry}>{t('compare.retry')}</Button>
+            <Button onClick={onUse} icon={Check}>{t('compare.use')}</Button>
+            <Button variant="secondary" onClick={() => setEditing(!editing)} icon={Pencil}>{editing ? t('compare.showChanges') : t('compare.edit')}</Button>
+            <Button variant="secondary" onClick={onRetry} icon={RotateCcw}>{t('compare.retry')}</Button>
             <Button variant="ghost" onClick={onDiscard}>{t('compare.keepMine')}</Button>
             {changes && (
               <span class="ml-auto text-xs text-muted">
-                <span class="text-good">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
+                <span class="text-brand">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
               </span>
             )}
             <InstructionBox
@@ -250,7 +255,7 @@ function Compare({
           </>
         ) : (
           <>
-            <Button variant="secondary" onClick={() => void ai.stop()}>{t('compare.stop')}</Button>
+            <Button variant="secondary" onClick={() => void ai.stop()} icon={Square}>{t('compare.stop')}</Button>
             <Button variant="ghost" onClick={() => { void ai.stop(); onDiscard(); }}>{t('compare.cancel')}</Button>
           </>
         )}
@@ -282,7 +287,7 @@ function DiffText({ parts, side }: { parts: DiffPart[]; side: 'before' | 'after'
             {p.type === 'del' ? (
               <del class="rounded bg-red-100 px-0.5 text-bad decoration-red-400">{words}</del>
             ) : (
-              <ins class="rounded bg-green-100 px-0.5 text-good no-underline">{words}</ins>
+              <ins class="rounded bg-brand-soft px-0.5 text-brand no-underline">{words}</ins>
             )}
             {space}
           </>
@@ -333,7 +338,9 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
     <section class="rounded-lg border border-line bg-surface shadow-sm">
       <div class="flex items-center gap-2 border-b border-line px-4 py-2">
         <h3 class="font-medium">{t('check.title')}</h3>
-        <button type="button" class="ml-auto text-muted hover:text-ink" onClick={onClose} aria-label={t('check.close')}>✕</button>
+        <button type="button" class="ml-auto text-muted hover:text-ink" onClick={onClose} aria-label={t('check.close')}>
+          <X size={18} />
+        </button>
       </div>
       <div class="p-4">
         {status.state === 'loading' ? (
@@ -370,7 +377,9 @@ function SensitiveBar({ matches }: { matches: SensitiveMatch[] }) {
   const { t } = useI18n();
   return (
     <div class="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm">
-      <span class="font-medium text-warn">{t('sensitive.title')}</span>
+      <span class="inline-flex items-center gap-1.5 font-medium text-warn">
+        <ShieldAlert size={16} aria-hidden="true" /> {t('sensitive.title')}
+      </span>
       <span class="text-xs text-muted">{t('sensitive.hint')}</span>
       {matches.map((m) => (
         <span class="rounded-full border border-amber-300 bg-surface px-2 py-0.5 text-xs">
@@ -406,7 +415,7 @@ function AiPill({ status }: { status: AiStatus }) {
     default:
       return status.cached === false ? (
         <button type="button" class={`${pill} hover:bg-canvas`} onClick={() => void ai.load().catch(() => {})}>
-          {t('ai.download')}
+          <Download size={13} aria-hidden="true" /> {t('ai.download')}
         </button>
       ) : (
         <span class={`${pill} text-muted`}>{t('ai.checking')}</span>
@@ -422,7 +431,9 @@ function InstructionBox({
   placeholder,
   button,
   disabled,
+  trailing,
 }: {
+  trailing?: ComponentChildren;
   value: string;
   onInput: (v: string) => void;
   onSubmit: () => void;
@@ -432,25 +443,26 @@ function InstructionBox({
 }) {
   return (
     <form
-      class="flex w-full basis-full gap-2"
+      class="flex w-full basis-full flex-wrap gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit();
       }}
     >
       <input
-        class="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand-soft"
+        class="min-w-[14rem] flex-1 rounded-md border border-line bg-surface px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand-soft"
         placeholder={placeholder}
         value={value}
         onInput={(e) => onInput(e.currentTarget.value)}
       />
       <button
         type="submit"
-        class="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+        class="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled || !value.trim()}
       >
-        ✨ {button}
+        <Sparkles size={15} aria-hidden="true" /> {button}
       </button>
+      {trailing && <div class="flex shrink-0 items-center">{trailing}</div>}
     </form>
   );
 }
@@ -461,7 +473,7 @@ function quote(instruction: string, lang: Lang) {
 }
 
 function Spinner() {
-  return <span class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand border-t-transparent" />;
+  return <LoaderCircle size={15} class="animate-spin text-brand" aria-hidden="true" />;
 }
 
 function Skeleton({ lines = 6 }: { lines?: number }) {

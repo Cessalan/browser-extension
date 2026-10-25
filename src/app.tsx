@@ -2,10 +2,11 @@ import { useEffect, useState } from 'preact/hooks';
 import { ReviewEmail } from './review/ReviewEmail';
 import { SpeedTest } from './speedtest/SpeedTest';
 import { setLang, useI18n, type Key } from './i18n';
+import { Gauge, Languages, Lock, Mail, type LucideIcon } from 'lucide-preact';
 
-const PAGES: { hash: string; label: Key; view: () => preact.JSX.Element }[] = [
-  { hash: '#/', label: 'nav.review', view: ReviewEmail },
-  { hash: '#/speed-test', label: 'nav.speedTest', view: SpeedTest },
+const PAGES: { hash: string; label: Key; icon: LucideIcon; view: () => preact.JSX.Element }[] = [
+  { hash: '#/', label: 'nav.review', icon: Mail, view: ReviewEmail },
+  { hash: '#/speed-test', label: 'nav.speedTest', icon: Gauge, view: SpeedTest },
 ];
 
 function useHash() {
@@ -26,7 +27,7 @@ export function App() {
 
   return (
     <div class="min-h-screen">
-      <header class="bg-brand text-white">
+      <header class="bg-nav text-white">
         <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <div class="flex items-center gap-3">
             <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" class="h-7 w-7 rounded-md ring-1 ring-white/30" />
@@ -36,21 +37,24 @@ export function App() {
             {PAGES.map((p) => (
               <a
                 href={p.hash}
-                class={`rounded-md px-3 py-1 text-sm ${p === page ? 'bg-white/20 font-medium' : 'text-white/80 hover:bg-white/10'}`}
+                class={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm ${p === page ? 'bg-white/15 font-medium' : 'text-white/75 hover:bg-white/10'}`}
               >
+                <p.icon size={15} aria-hidden="true" />
                 {t(p.label)}
               </a>
             ))}
           </nav>
           <div class="ml-auto flex items-center gap-2">
-            <span class="rounded-full bg-white/15 px-2.5 py-0.5 text-xs">{t('app.private')}</span>
+            <span class="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-white/90">
+              <Lock size={12} aria-hidden="true" /> {t('app.private')}
+            </span>
             <button
               type="button"
-              class="rounded-md border border-white/30 px-2 py-0.5 text-xs hover:bg-white/10"
+              class="inline-flex items-center gap-1 rounded-md border border-white/25 px-2 py-0.5 text-xs hover:bg-white/10"
               onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
               lang={lang === 'fr' ? 'en' : 'fr'}
             >
-              {t('app.switchLang')}
+              <Languages size={13} aria-hidden="true" /> {t('app.switchLang')}
             </button>
           </div>
         </div>

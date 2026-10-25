@@ -5,10 +5,11 @@
   by changing only these values.
 */
 @theme {
-  --color-brand: #0f766e;
-  --color-brand-soft: #ccfbf1;
+  --color-nav: #0f2a4a;
+  --color-brand: #2563eb;
+  --color-brand-soft: #dbeafe;
   --color-surface: #ffffff;
-  --color-canvas: #f8fafc;
+  --color-canvas: #f5f7fb;
   --color-ink: #0f172a;
   --color-muted: #64748b;
   --color-line: #e2e8f0;

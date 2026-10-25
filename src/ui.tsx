@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import type { LucideIcon } from 'lucide-preact';
 
 export type Progress = { fraction: number; text: string } | null;
 
@@ -25,9 +26,11 @@ export function Button({
   onClick,
   disabled,
   title,
+  icon: Icon,
   variant = 'primary',
 }: {
   children: ComponentChildren;
+  icon?: LucideIcon;
   onClick: () => void;
   disabled?: boolean;
   title?: string;
@@ -36,11 +39,12 @@ export function Button({
   return (
     <button
       type="button"
-      class={`rounded-md px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${BUTTON_STYLE[variant]}`}
+      class={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${BUTTON_STYLE[variant]}`}
       onClick={onClick}
       disabled={disabled}
       title={title}
     >
+      {Icon && <Icon size={16} strokeWidth={2} aria-hidden="true" />}
       {children}
     </button>
   );
