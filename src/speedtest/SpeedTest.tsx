@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Button, Card, ProgressBar, type Progress } from '../ui';
+import { useI18n } from '../i18n';
 import { getDeviceInfo, type DeviceInfo } from './device';
 import type { LlmResult } from './llm';
 import type { SttResult } from './stt';
@@ -15,6 +16,7 @@ export function SpeedTest() {
   const [sttProgress, setSttProgress] = useState<Progress>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     getDeviceInfo().then(setDevice);
@@ -27,7 +29,7 @@ export function SpeedTest() {
     setError(null);
     // Ask the browser not to evict the model when disk space runs low.
     await navigator.storage?.persist?.().catch(() => false);
-    setLlmProgress({ fraction: 0, text: 'Starting…' });
+    setLlmProgress({ fraction: 0, text: t('speed.starting') });
     try {
       // Loaded on demand so the app itself opens instantly.
       const { runLlmTest } = await import('./llm');
@@ -41,7 +43,7 @@ export function SpeedTest() {
 
   async function testStt() {
     setError(null);
-    setSttProgress({ fraction: 0, text: 'Starting…' });
+    setSttProgress({ fraction: 0, text: t('speed.starting') });
     try {
       const { runSttTest } = await import('./stt');
       setStt(await runSttTest((fraction, text) => setSttProgress({ fraction, text })));
@@ -62,33 +64,33 @@ export function SpeedTest() {
   return (
     <div class="mx-auto max-w-3xl space-y-4">
       <div>
-        <h2 class="text-xl font-semibold">Device speed test</h2>
+        <h2 class="text-xl font-semibold">{t('speed.title')}</h2>
         <p class="text-sm text-muted">
-          Checks if this computer can run the assistant's AI locally. The first run downloads the models once; later runs use the saved copy. No data leaves this computer.
+          {t('speed.intro')}
         </p>
       </div>
 
-      <Card title="1. This computer">
+      <Card title={t('speed.computer')}>
         {!device ? (
-          <p class="text-sm text-muted">Checking…</p>
+          <p class="text-sm text-muted">{t('speed.checking')}</p>
         ) : (
           <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
-            <Stat label="GPU acceleration" value={device.webgpu ? 'Yes' : 'No'} verdict={device.webgpu ? 'good' : 'slow'} />
-            <Stat label="RAM" value={device.memoryGB ? `${device.memoryGB}+ GB` : 'Unknown'} verdict={device.memoryGB == null ? undefined : device.memoryGB >= 8 ? 'good' : 'ok'} />
-            <Stat label="CPU cores" value={String(device.cores ?? '?')} />
-            <Stat label="Free storage" value={device.storageFreeGB != null ? `${device.storageFreeGB} GB` : '?'} verdict={device.storageFreeGB == null ? undefined : device.storageFreeGB >= 3 ? 'good' : 'slow'} />
-            <Stat label="GPU" value={device.gpu ?? '-'} />
-            <Stat label="Chrome built-in AI" value={device.builtInAI} />
+            <Stat label={t('speed.gpuAccel')} value={device.webgpu ? t('speed.yes') : t('speed.no')} verdict={device.webgpu ? 'good' : 'slow'} />
+            <Stat label={t('speed.ram')} value={device.memoryGB ? `${device.memoryGB}+ GB` : t('speed.unknown')} verdict={device.memoryGB == null ? undefined : device.memoryGB >= 8 ? 'good' : 'ok'} />
+            <Stat label={t('speed.cores')} value={String(device.cores ?? '?')} />
+            <Stat label={t('speed.storage')} value={device.storageFreeGB != null ? `${device.storageFreeGB} GB` : '?'} verdict={device.storageFreeGB == null ? undefined : device.storageFreeGB >= 3 ? 'good' : 'slow'} />
+            <Stat label={t('speed.gpu')} value={device.gpu ?? '-'} />
+            <Stat label={t('speed.builtInAI')} value={device.builtInAI} />
           </dl>
         )}
         {device && !device.webgpu && (
           <p class="mt-3 rounded-md bg-red-50 p-2 text-sm text-bad">
-            This browser has no WebGPU. Use an up-to-date Chrome or Edge. The text model can't run without it.
+            {t('speed.noWebgpu')}
           </p>
         )}
       </Card>
 
-      <Card title="2. Writing assistant (text model)">
+      <Card title={t('speed.textModel')}>
         <div class="flex flex-wrap items-center gap-2">
           <select
             class="rounded-md border border-line bg-surface px-2 py-1.5 text-sm"
@@ -100,36 +102,36 @@ export function SpeedTest() {
               <option value={m.id}>{m.label} · ~{m.downloadMB} MB</option>
             ))}
           </select>
-          <Button onClick={testLlm} disabled={busy || !device?.webgpu}>Run test</Button>
+          <Button onClick={testLlm} disabled={busy || !device?.webgpu}>{t('speed.run')}</Button>
         </div>
         <ProgressBar progress={llmProgress} />
         {llm && (
           <div class="mt-3 space-y-2">
             <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
-              <Stat label="Speed" value={`${llm.tokensPerSecond.toFixed(1)} tokens/s`} verdict={llmVerdict(llm.tokensPerSecond)} />
-              <Stat label="First word" value={`${llm.firstTokenSeconds.toFixed(1)} s`} />
-              <Stat label={llm.wasCached ? 'Load (saved copy)' : 'Download + load'} value={`${llm.loadSeconds.toFixed(0)} s`} />
-              <Stat label="Model" value={llm.modelId.replace(/-q4f(16|32)_1-MLC$/, '')} />
+              <Stat label={t('speed.speed')} value={`${llm.tokensPerSecond.toFixed(1)} tokens/s`} verdict={llmVerdict(llm.tokensPerSecond)} />
+              <Stat label={t('speed.firstWord')} value={`${llm.firstTokenSeconds.toFixed(1)} s`} />
+              <Stat label={llm.wasCached ? t('speed.loadCached') : t('speed.loadFirst')} value={`${llm.loadSeconds.toFixed(0)} s`} />
+              <Stat label={t('speed.model')} value={llm.modelId.replace(/-q4f(16|32)_1-MLC$/, '')} />
             </dl>
             <details class="text-sm">
-              <summary class="cursor-pointer text-muted">Sample output</summary>
+              <summary class="cursor-pointer text-muted">{t('speed.sample')}</summary>
               <pre class="mt-1 whitespace-pre-wrap rounded-md bg-canvas p-2 font-sans">{llm.output}</pre>
             </details>
           </div>
         )}
       </Card>
 
-      <Card title="3. Dictation (speech model)">
+      <Card title={t('speed.dictation')}>
         <div class="flex flex-wrap items-center gap-2">
-          <span class="text-sm text-muted">Moonshine Tiny · ~60 MB · transcribes an 11 s sample clip</span>
-          <Button onClick={testStt} disabled={busy}>Run test</Button>
+          <span class="text-sm text-muted">{t('speed.dictationInfo')}</span>
+          <Button onClick={testStt} disabled={busy}>{t('speed.run')}</Button>
         </div>
         <ProgressBar progress={sttProgress} />
         {stt && (
           <div class="mt-3 space-y-2">
             <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
-              <Stat label="Transcribe time" value={`${stt.transcribeSeconds.toFixed(1)} s for ${stt.audioSeconds.toFixed(0)} s audio`} verdict={sttVerdict(stt)} />
-              <Stat label="Load" value={`${stt.loadSeconds.toFixed(1)} s`} />
+              <Stat label={t('speed.transcribe')} value={t('speed.transcribeValue', { t: stt.transcribeSeconds.toFixed(1), a: stt.audioSeconds.toFixed(0) })} verdict={sttVerdict(stt)} />
+              <Stat label={t('speed.load')} value={`${stt.loadSeconds.toFixed(1)} s`} />
             </dl>
             <p class="rounded-md bg-canvas p-2 text-sm">“{stt.text}”</p>
           </div>
@@ -140,9 +142,9 @@ export function SpeedTest() {
 
       <div class="flex items-center gap-3">
         <Button onClick={copyReport} disabled={!device} variant="secondary">
-          {copied ? 'Copied ✓' : 'Copy results'}
+          {copied ? t('speed.copied') : t('speed.copy')}
         </Button>
-        <span class="text-xs text-muted">Paste the results to share them. They contain only device specs and speeds.</span>
+        <span class="text-xs text-muted">{t('speed.copyHint')}</span>
       </div>
     </div>
   );

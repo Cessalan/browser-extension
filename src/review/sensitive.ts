@@ -1,18 +1,22 @@
+export type SensitiveKind = 'ssn' | 'nam' | 'mrn' | 'dob' | 'phone' | 'email' | 'date' | 'id';
+
 export interface SensitiveMatch {
-  kind: string;
+  kind: SensitiveKind;
   text: string;
   index: number;
 }
 
-// Ordered by priority: when two patterns overlap, the earlier one wins.
-const PATTERNS: { kind: string; re: RegExp }[] = [
-  { kind: 'SSN', re: /\b\d{3}-\d{2}-\d{4}\b/g },
-  { kind: 'Medical record number', re: /\b(?:MRN|medical record(?: number| no\.?)?)\s*[#:]?\s*[A-Z0-9-]{4,}\b/gi },
-  { kind: 'Date of birth', re: /\b(?:DOB|D\.O\.B\.|date of birth|born)\s*[:#]?\s*[\d/.-]{6,10}\b/gi },
-  { kind: 'Phone number', re: /(?:\+?1[-.\s]?)?\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g },
-  { kind: 'Email address', re: /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g },
-  { kind: 'Date', re: /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g },
-  { kind: 'Long ID number', re: /\b\d{7,}\b/g },
+// Ordered by priority: when two patterns overlap, the earlier one wins. Covers English and French (Quebec) wording.
+const PATTERNS: { kind: SensitiveKind; re: RegExp }[] = [
+  { kind: 'ssn', re: /\b\d{3}-\d{2}-\d{4}\b/g },
+  // Quebec health insurance number (NAM / RAMQ): 4 letters + 8 digits.
+  { kind: 'nam', re: /\b[A-Z]{4}\s?\d{4}\s?\d{4}\b/g },
+  { kind: 'mrn', re: /(?:\bMRN|\bmedical record(?: number| no\.?)?|\bn(?:o|°|º)\.?\s*(?:de\s+)?dossier|\bdossier)\s*[#:]?\s*[A-Z0-9-]{4,}\b/gi },
+  { kind: 'dob', re: /(?:\bDOB|\bD\.O\.B\.|\bdate of birth|\bborn|\bDDN|\bdate de naissance|\bné(?:e)? le)\s*[:#]?\s*[\d/.-]{6,10}\b/gi },
+  { kind: 'phone', re: /(?:\+?1[-.\s]?)?\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g },
+  { kind: 'email', re: /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g },
+  { kind: 'date', re: /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b/g },
+  { kind: 'id', re: /\b\d{7,}\b/g },
 ];
 
 /**

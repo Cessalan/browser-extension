@@ -136,10 +136,16 @@ class MockAI extends LocalAI {
   }
 
   async generate(messages: Message[], onText: (text: string) => void) {
-    const draft = String(messages.at(-1)?.content ?? '');
-    const reply = String(messages[0].content).includes('List up to')
-      ? '- The date for the discharge is not stated.\n- Say who will arrange transport.\n- "pending the final PT eval" may be unclear to the family.'
-      : draft.replace(/\bpt\b/gi, 'the patient').replace(/\bu\b/g, 'you').replace(/\br\b/g, 'are').replace(/thx|thanks/i, 'Thank you,');
+    const system = String(messages[0].content);
+    const user = String(messages.at(-1)?.content ?? '');
+    const draft = user.includes('\n\nEmail:\n') ? user.split('\n\nEmail:\n')[1] : user;
+    const reply = system.includes('List up to')
+      ? system.includes('in French')
+        ? '- La date du congé n’est pas précisée.\n- Indiquez qui organise le transport.\n- « eval en physio » peut être flou pour la famille.'
+        : '- The date for the discharge is not stated.\n- Say who will arrange transport.\n- "pending the final PT eval" may be unclear to the family.'
+      : /[àâéèêçù]/.test(draft)
+        ? draft.replace(/\bpt\b/gi, 'patient').replace(/\bpret\b/, 'prêt').replace(/rappelerait/, 'rappellerait').replace(/^merci$/m, 'Merci,')
+        : draft.replace(/\bpt\b/gi, 'the patient').replace(/\bu\b/g, 'you').replace(/\br\b/g, 'are').replace(/thx|thanks/i, 'Thank you,');
     await new Promise((r) => setTimeout(r, 1500)); // simulate the model thinking before the first word
     let text = '';
     for (const word of reply.split(/(?<=\s)/)) {

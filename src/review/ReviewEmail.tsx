@@ -1,20 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { ai, useAiStatus, type AiStatus, type Message } from '../ai/engine';
 import { Button } from '../ui';
+import { useI18n, type Lang } from '../i18n';
 import { findSensitive, type SensitiveMatch } from './sensitive';
-import { REWRITES, cleanRewrite, parseBullets, reviewMessages, rewriteMessages, type RewriteId } from './prompts';
+import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, rewriteMessages } from './prompts';
 import { countChanges, diffWords, type DiffPart } from './diff';
 
-// Made-up example. Never use real patient data here.
-const EXAMPLE = `Hi Dr. Patel,
+// Made-up examples. Never use real patient data here.
+const EXAMPLE_FR = `Bonjour Dre Tremblay,
+
+suivi pour le pt dont on a parlé mardi, il est pret pour le congé vers la réadapt vendredi si l'eval en physio est ok. pouvez vous confirmer que les ordonnances sont signées? la famille demande pour le transport, j'ai dit qu'on les rappelerait. dossier 4482913
+
+merci
+Jordan`;
+
+const EXAMPLES: Record<Lang, string> = { fr: EXAMPLE_FR, en: `Hi Dr. Patel,
 
 following up on pt we discussed tuesday, they r ready for d/c to rehab friday pending final PT eval. can u confirm orders are signed? family asked about transport i said we would call back. MRN 00482913
 
 thx
-Jordan`;
+Jordan` };
 
 type Review = { kind: 'review'; text: string; done: boolean; forDraft: string; startedAt: number };
-type Rewrite = { kind: 'rewrite'; id: RewriteId; label: string; original: string; text: string; done: boolean; startedAt: number };
+type Rewrite = { kind: 'rewrite'; label: string; original: string; messages: Message[]; text: string; done: boolean; startedAt: number };
 type Task = Review | Rewrite;
 
 export function ReviewEmail() {
@@ -23,7 +31,9 @@ export function ReviewEmail() {
   const [task, setTask] = useState<Task | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [instruction, setInstruction] = useState('');
   const status = useAiStatus();
+  const { lang, t } = useI18n();
   const editor = useRef<HTMLTextAreaElement>(null);
 
   const sensitive = useMemo(() => findSensitive(draft), [draft]);
@@ -54,12 +64,19 @@ export function ReviewEmail() {
 
   function review() {
     if (!draft.trim() || running) return;
-    void run({ kind: 'review', text: '', done: false, forDraft: draft, startedAt: Date.now() }, reviewMessages(draft));
+    void run({ kind: 'review', text: '', done: false, forDraft: draft, startedAt: Date.now() }, reviewMessages(draft, lang));
   }
 
-  function rewrite(id: RewriteId, original = draft) {
-    const { label } = REWRITES.find((r) => r.id === id)!;
-    void run({ kind: 'rewrite', id, label, original, text: '', done: false, startedAt: Date.now() }, rewriteMessages(id, original));
+  /** `original` is what the diff compares against; `messages` may target a previous suggestion when refining. */
+  function rewrite(label: string, original: string, messages: Message[]) {
+    void run({ kind: 'rewrite', label, original, messages, text: '', done: false, startedAt: Date.now() }, messages);
+  }
+
+  function applyInstruction() {
+    const text = instruction.trim();
+    if (!text || !canAct) return;
+    rewrite(quote(text, lang), draft, customMessages(text, draft));
+    setInstruction('');
   }
 
   async function copy() {
@@ -75,18 +92,26 @@ export function ReviewEmail() {
       {/* Toolbar */}
       <div class="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-2 shadow-sm">
         <Button onClick={review} disabled={!canAct} title="Ctrl + Enter">
-          ✓ Check my email
+          {t('review.check')}
         </Button>
         <span class="mx-1 hidden h-6 w-px bg-line sm:block" />
-        <span class="px-1 text-xs font-medium uppercase tracking-wide text-muted">Rewrite</span>
+        <span class="px-1 text-xs font-medium uppercase tracking-wide text-muted">{t('review.rewrite')}</span>
         {REWRITES.map((r) => (
-          <Button key={r.id} variant="secondary" onClick={() => rewrite(r.id)} disabled={!canAct}>
-            {r.label}
+          <Button key={r.id} variant="secondary" onClick={() => rewrite(t(r.label), draft, rewriteMessages(r.id, draft))} disabled={!canAct}>
+            {t(r.label)}
           </Button>
         ))}
         <div class="ml-auto">
           <AiPill status={status} />
         </div>
+        <InstructionBox
+          value={instruction}
+          onInput={setInstruction}
+          onSubmit={applyInstruction}
+          placeholder={t('custom.placeholder')}
+          button={t('custom.apply')}
+          disabled={!canAct}
+        />
       </div>
 
       {sensitive.length > 0 && <SensitiveBar matches={sensitive} />}
@@ -98,28 +123,29 @@ export function ReviewEmail() {
           status={status}
           onChange={(text) => setTask({ ...task, text })}
           onUse={() => { replaceDraft(task.text); setTask(null); }}
-          onRetry={() => rewrite(task.id, task.original)}
+          onRetry={() => rewrite(task.label, task.original, task.messages)}
+          onRefine={(text) => rewrite(quote(text, lang), task.original, customMessages(text, task.text))}
           onDiscard={() => setTask(null)}
         />
       ) : (
         <div class={`grid items-start gap-4 ${task ? 'lg:grid-cols-[minmax(0,1fr)_340px]' : ''}`}>
           <section class="rounded-lg border border-line bg-surface shadow-sm">
             <div class="flex items-center gap-2 border-b border-line px-4 py-2">
-              <h3 class="font-medium">Your email</h3>
-              <span class="text-xs text-muted">{words} words</span>
+              <h3 class="font-medium">{t('editor.title')}</h3>
+              <span class="text-xs text-muted">{t('editor.words', { n: words })}</span>
               <div class="ml-auto flex gap-1">
-                <Button variant="ghost" onClick={() => { setDraft(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title="Undo last change">
-                  ↶ Undo
+                <Button variant="ghost" onClick={() => { setDraft(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')}>
+                  {t('editor.undo')}
                 </Button>
                 <Button variant="ghost" onClick={() => { replaceDraft(''); setTask(null); }} disabled={!draft}>
-                  Clear
+                  {t('editor.clear')}
                 </Button>
               </div>
             </div>
             <textarea
               ref={editor}
               class="block min-h-[420px] w-full resize-y bg-transparent p-4 text-[15px] leading-relaxed outline-none"
-              placeholder="Paste or type your email here…"
+              placeholder={t('editor.placeholder')}
               value={draft}
               onInput={(e) => setDraft(e.currentTarget.value)}
               onKeyDown={(e) => {
@@ -129,14 +155,14 @@ export function ReviewEmail() {
             />
             <div class="flex flex-wrap items-center gap-3 border-t border-line px-4 py-2">
               <Button onClick={copy} disabled={!draft.trim()}>
-                {copied ? 'Copied ✓' : 'Copy to send'}
+                {copied ? t('editor.copied') : t('editor.copy')}
               </Button>
               {!draft && (
-                <button type="button" class="text-sm text-brand underline" onClick={() => { setDraft(EXAMPLE); editor.current?.focus(); }}>
-                  Try with an example
+                <button type="button" class="text-sm text-brand underline" onClick={() => { setDraft(EXAMPLES[lang]); editor.current?.focus(); }}>
+                  {t('editor.example')}
                 </button>
               )}
-              <span class="ml-auto text-xs text-muted">Not saved. Closing the tab clears it.</span>
+              <span class="ml-auto text-xs text-muted">{t('editor.notSaved')}</span>
             </div>
           </section>
 
@@ -155,6 +181,7 @@ function Compare({
   onChange,
   onUse,
   onRetry,
+  onRefine,
   onDiscard,
 }: {
   task: Rewrite;
@@ -162,9 +189,12 @@ function Compare({
   onChange: (text: string) => void;
   onUse: () => void;
   onRetry: () => void;
+  onRefine: (instruction: string) => void;
   onDiscard: () => void;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
+  const [refine, setRefine] = useState('');
   const parts = useMemo(() => (task.done ? diffWords(task.original, task.text) : null), [task.done, task.original, task.text]);
   const changes = parts && countChanges(parts);
 
@@ -172,13 +202,13 @@ function Compare({
     <section class="rounded-lg border border-line bg-surface shadow-sm">
       <div class="grid md:grid-cols-2">
         <div class="border-b border-line md:border-b-0 md:border-r">
-          <PaneHeader title="Your email" hint={parts ? 'Removed text in red' : undefined} />
+          <PaneHeader title={t('editor.title')} hint={parts ? t('compare.removed') : undefined} />
           <div class="whitespace-pre-wrap p-4 text-[15px] leading-relaxed">
             {parts ? <DiffText parts={parts} side="before" /> : task.original}
           </div>
         </div>
         <div class="bg-brand-soft/30">
-          <PaneHeader title={`Suggestion: ${task.label}`} hint={parts && !editing ? 'Added text in green' : undefined} />
+          <PaneHeader title={t('compare.suggestion', { label: task.label })} hint={parts && !editing ? t('compare.added') : undefined} />
           {editing ? (
             <textarea
               class="block min-h-[300px] w-full resize-y bg-surface p-4 text-[15px] leading-relaxed outline-none ring-2 ring-inset ring-brand/40"
@@ -196,20 +226,32 @@ function Compare({
       <div class="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3">
         {task.done ? (
           <>
-            <Button onClick={onUse}>Use this version</Button>
-            <Button variant="secondary" onClick={() => setEditing(!editing)}>{editing ? 'Show changes' : 'Edit'}</Button>
-            <Button variant="secondary" onClick={onRetry}>Try again</Button>
-            <Button variant="ghost" onClick={onDiscard}>Keep mine</Button>
+            <Button onClick={onUse}>{t('compare.use')}</Button>
+            <Button variant="secondary" onClick={() => setEditing(!editing)}>{editing ? t('compare.showChanges') : t('compare.edit')}</Button>
+            <Button variant="secondary" onClick={onRetry}>{t('compare.retry')}</Button>
+            <Button variant="ghost" onClick={onDiscard}>{t('compare.keepMine')}</Button>
             {changes && (
               <span class="ml-auto text-xs text-muted">
-                <span class="text-good">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> words
+                <span class="text-good">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
               </span>
             )}
+            <InstructionBox
+              value={refine}
+              onInput={setRefine}
+              onSubmit={() => {
+                if (!refine.trim()) return;
+                setEditing(false);
+                onRefine(refine.trim());
+                setRefine('');
+              }}
+              placeholder={t('compare.refine')}
+              button={t('custom.apply')}
+            />
           </>
         ) : (
           <>
-            <Button variant="secondary" onClick={() => void ai.stop()}>Stop</Button>
-            <Button variant="ghost" onClick={() => { void ai.stop(); onDiscard(); }}>Cancel</Button>
+            <Button variant="secondary" onClick={() => void ai.stop()}>{t('compare.stop')}</Button>
+            <Button variant="ghost" onClick={() => { void ai.stop(); onDiscard(); }}>{t('compare.cancel')}</Button>
           </>
         )}
       </div>
@@ -252,15 +294,16 @@ function DiffText({ parts, side }: { parts: DiffPart[]; side: 'before' | 'after'
 
 /** What the user sees while the AI works: model loading, then "thinking", then text appearing. */
 function Streaming({ text, startedAt, status }: { text: string; startedAt: number; status: AiStatus }) {
+  const { t } = useI18n();
   const seconds = useElapsed(startedAt);
   if (status.state === 'loading') {
     return (
       <div class="space-y-2 text-sm">
-        <p>Starting the AI… {Math.round(status.fraction * 100)}%</p>
+        <p>{t('ai.startingLong', { pct: Math.round(status.fraction * 100) })}</p>
         <div class="h-1.5 overflow-hidden rounded-full bg-brand-soft">
           <div class="h-full bg-brand transition-all" style={{ width: `${Math.round(status.fraction * 100)}%` }} />
         </div>
-        <p class="text-xs text-muted">First time only. After this it starts in seconds.</p>
+        <p class="text-xs text-muted">{t('ai.firstTimeOnly')}</p>
       </div>
     );
   }
@@ -268,7 +311,7 @@ function Streaming({ text, startedAt, status }: { text: string; startedAt: numbe
     return (
       <div>
         <p class="mb-3 flex items-center gap-2 text-sm text-muted">
-          <Spinner /> Writing… {seconds}s
+          <Spinner /> {t('compare.writing', { s: seconds })}
         </p>
         <Skeleton />
       </div>
@@ -283,13 +326,14 @@ function Streaming({ text, startedAt, status }: { text: string; startedAt: numbe
 }
 
 function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: AiStatus; stale: boolean; onClose: () => void }) {
+  const { t } = useI18n();
   const items = parseBullets(task.text);
   const seconds = useElapsed(task.startedAt);
   return (
     <section class="rounded-lg border border-line bg-surface shadow-sm">
       <div class="flex items-center gap-2 border-b border-line px-4 py-2">
-        <h3 class="font-medium">Check results</h3>
-        <button type="button" class="ml-auto text-muted hover:text-ink" onClick={onClose} aria-label="Close">✕</button>
+        <h3 class="font-medium">{t('check.title')}</h3>
+        <button type="button" class="ml-auto text-muted hover:text-ink" onClick={onClose} aria-label={t('check.close')}>✕</button>
       </div>
       <div class="p-4">
         {status.state === 'loading' ? (
@@ -297,7 +341,7 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
         ) : items.length === 0 && !task.done ? (
           <>
             <p class="mb-3 flex items-center gap-2 text-sm text-muted">
-              <Spinner /> Reading your email… {seconds}s
+              <Spinner /> {t('check.reading', { s: seconds })}
             </p>
             <Skeleton lines={3} />
           </>
@@ -311,10 +355,10 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
             ))}
           </ul>
         )}
-        {task.done && stale && <p class="mt-3 text-xs text-warn">You've edited the email since this check.</p>}
+        {task.done && stale && <p class="mt-3 text-xs text-warn">{t('check.stale')}</p>}
         {!task.done && status.state !== 'loading' && (
           <div class="mt-3">
-            <Button variant="ghost" onClick={() => void ai.stop()}>Stop</Button>
+            <Button variant="ghost" onClick={() => void ai.stop()}>{t('compare.stop')}</Button>
           </div>
         )}
       </div>
@@ -323,13 +367,14 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
 }
 
 function SensitiveBar({ matches }: { matches: SensitiveMatch[] }) {
+  const { t } = useI18n();
   return (
     <div class="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm">
-      <span class="font-medium text-warn">⚠ Patient details found</span>
-      <span class="text-xs text-muted">Send through secure email, or remove them:</span>
+      <span class="font-medium text-warn">{t('sensitive.title')}</span>
+      <span class="text-xs text-muted">{t('sensitive.hint')}</span>
       {matches.map((m) => (
-        <span class="rounded-full border border-amber-300 bg-surface px-2 py-0.5 text-xs" title={m.kind}>
-          {m.kind}: <code class="font-mono">{m.text}</code>
+        <span class="rounded-full border border-amber-300 bg-surface px-2 py-0.5 text-xs">
+          {t(`kind.${m.kind}`)}: <code class="font-mono">{m.text}</code>
         </span>
       ))}
     </div>
@@ -337,35 +382,82 @@ function SensitiveBar({ matches }: { matches: SensitiveMatch[] }) {
 }
 
 function AiPill({ status }: { status: AiStatus }) {
+  const { t } = useI18n();
   const pill = 'flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs';
   switch (status.state) {
     case 'ready':
       return (
         <span class={pill}>
-          <span class="h-2 w-2 rounded-full bg-good" /> AI ready · on this computer
+          <span class="h-2 w-2 rounded-full bg-good" /> {t('ai.ready')}
         </span>
       );
     case 'loading':
       return (
         <span class={pill}>
-          <Spinner /> AI starting {Math.round(status.fraction * 100)}%
+          <Spinner /> {t('ai.starting', { pct: Math.round(status.fraction * 100) })}
         </span>
       );
     case 'error':
       return (
         <button type="button" class={`${pill} border-red-200 bg-red-50 text-bad`} title={status.message} onClick={() => void ai.load().catch(() => {})}>
-          AI couldn't start · Retry
+          {t('ai.retry')}
         </button>
       );
     default:
       return status.cached === false ? (
         <button type="button" class={`${pill} hover:bg-canvas`} onClick={() => void ai.load().catch(() => {})}>
-          ⬇ Download AI (~700 MB, once)
+          {t('ai.download')}
         </button>
       ) : (
-        <span class={`${pill} text-muted`}>Checking AI…</span>
+        <span class={`${pill} text-muted`}>{t('ai.checking')}</span>
       );
   }
+}
+
+/** One-line instruction box ("make it warmer", "mets la demande en premier"…). Enter submits. */
+function InstructionBox({
+  value,
+  onInput,
+  onSubmit,
+  placeholder,
+  button,
+  disabled,
+}: {
+  value: string;
+  onInput: (v: string) => void;
+  onSubmit: () => void;
+  placeholder: string;
+  button: string;
+  disabled?: boolean;
+}) {
+  return (
+    <form
+      class="flex w-full basis-full gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+    >
+      <input
+        class="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand-soft"
+        placeholder={placeholder}
+        value={value}
+        onInput={(e) => onInput(e.currentTarget.value)}
+      />
+      <button
+        type="submit"
+        class="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={disabled || !value.trim()}
+      >
+        ✨ {button}
+      </button>
+    </form>
+  );
+}
+
+function quote(instruction: string, lang: Lang) {
+  const short = instruction.length > 40 ? instruction.slice(0, 40) + '…' : instruction;
+  return lang === 'fr' ? `« ${short} »` : `“${short}”`;
 }
 
 function Spinner() {

@@ -4,8 +4,9 @@ Liaison Assistant: a private, local-AI web app (PWA) for liaison nurses. Formerl
 This project is unrelated to NurseQuizAI.
 
 - Vite + TypeScript + Preact + Tailwind v4. Design tokens live in `src/index.css` (`@theme`).
+- `src/i18n.ts`: English/French UI strings. French is picked from the browser language; header button switches. Add every new UI string to both dictionaries.
 - `src/ai/engine.ts`: shared on-device text model (WebLLM in a Web Worker). Dev only: open `/?mockai` for a fake AI.
-- `src/review/`: Review email screen (paste, check, rewrite, edit, copy). `sensitive.ts` flags patient identifiers without AI.
+- `src/review/`: Review email screen (paste, check, rewrite, custom instruction, compare, copy). Prompts must keep the email's language (EN or FR). `sensitive.ts` flags patient identifiers without AI.
 - `src/speedtest/`: device speed test. AI runs in Web Workers (`*.worker.ts`).
   - Text: WebLLM (`llm.ts`), models in `models.ts`.
   - Speech: transformers.js + Moonshine (`stt.ts`).
