@@ -1,6 +1,6 @@
 import type { ChatCompletionMessageParam, WebWorkerMLCEngine } from '@mlc-ai/web-llm';
 import { useEffect, useState } from 'preact/hooks';
-import { TEXT_MODELS, chatOptions, fallbackModelId, resolveModelId } from '../speedtest/models';
+import { chatOptions, extraBody, fallbackModelId, loadMode, modeInfo, resolveModelId, saveMode, type AiMode } from '../speedtest/models';
 
 export type AiStatus =
   | { state: 'idle'; cached: boolean | null }
@@ -12,11 +12,14 @@ export type Message = ChatCompletionMessageParam;
 
 /**
  * The on-device text model, shared by the whole app. Loaded once per tab, in a Web Worker.
- * The ~700 MB download happens only the first time; after that it loads from the browser cache.
+ * The download happens only the first time; after that it loads from the browser cache.
  */
 class LocalAI {
   status: AiStatus = { state: 'idle', cached: null };
+  /** The nurse's choice of Faster / Standard / Smarter, remembered on this computer. */
+  mode: AiMode = loadMode();
   private engine: Promise<WebWorkerMLCEngine> | null = null;
+  private loadedModelId: string | null = null;
   private modelIds: Promise<{ primary: string; fallback: string }> | null = null;
   private listeners = new Set<(s: AiStatus) => void>();
 
@@ -30,13 +33,27 @@ class LocalAI {
     this.listeners.forEach((fn) => fn(status));
   }
 
-  /** Picks the default model, using the 32-bit build on GPUs without 16-bit support. */
+  /** Switches mode. A model already in memory is unloaded; the new one loads on next use. */
+  async setMode(mode: AiMode) {
+    if (mode === this.mode) return;
+    this.mode = mode;
+    saveMode(mode);
+    const engine = this.engine;
+    this.engine = null;
+    this.modelIds = null;
+    this.loadedModelId = null;
+    this.set({ state: 'idle', cached: null });
+    await (await engine?.catch(() => null))?.unload().catch(() => {});
+    void this.checkCached();
+  }
+
+  /** Picks the model for the current mode, using the 32-bit build on GPUs without 16-bit support. */
   private getModelIds() {
     this.modelIds ??= (async () => {
       const adapter = await navigator.gpu?.requestAdapter().catch(() => null);
       if (!adapter) throw new Error('This browser has no WebGPU. Use an up-to-date Chrome or Edge.');
       const f16 = adapter.features.has('shader-f16');
-      return { primary: resolveModelId(TEXT_MODELS[0].id, f16), fallback: fallbackModelId(f16) };
+      return { primary: resolveModelId(modeInfo(this.mode).modelId, f16), fallback: fallbackModelId(f16) };
     })();
     return this.modelIds;
   }
@@ -75,10 +92,12 @@ class LocalAI {
       let engine: WebWorkerMLCEngine;
       try {
         engine = await start(primary);
+        this.loadedModelId = primary;
       } catch (err) {
         if (primary === fallback) throw err;
         console.warn(`${primary} failed to start, falling back to ${fallback}`, err);
         engine = await start(fallback);
+        this.loadedModelId = fallback;
       }
       this.set({ state: 'ready' });
       return engine;
@@ -98,6 +117,7 @@ class LocalAI {
       stream: true,
       max_tokens: maxTokens,
       temperature: 0.3,
+      extra_body: this.loadedModelId ? extraBody(this.loadedModelId) : undefined,
     });
     let text = '';
     for await (const chunk of stream) {

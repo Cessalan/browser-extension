@@ -7,8 +7,9 @@ This project is unrelated to NurseQuizAI.
 - `src/i18n.ts`: English/French UI strings. French is picked from the browser language; header button switches. Add every new UI string to both dictionaries.
 - `src/ai/engine.ts`: shared on-device text model (WebLLM in a Web Worker). Dev only: open `/?mockai` for a fake AI.
 - `src/review/`: Review email screen (paste, check, rewrite, custom instruction, compare, copy). Prompts must keep the email's language (EN or FR). `sensitive.ts` flags patient identifiers without AI.
-- `src/speedtest/`: device speed test. AI runs in Web Workers (`*.worker.ts`).
-  - Text: WebLLM (`llm.ts`), models in `models.ts`.
+- `src/speedtest/`: the Setup page (device check + AI mode). AI runs in Web Workers (`*.worker.ts`).
+  - Text: WebLLM (`llm.ts`). `models.ts` maps AI modes (Faster / Standard / Smarter) to models.
+  - Never show model names or jargon in the main UI; technical details stay in the collapsed section.
   - Speech: transformers.js + Moonshine (`stt.ts`).
 - No backend. Never add network calls that send user data anywhere. CSP in `index.html` enforces this.
 - Never put real patient data in prompts, tests, or fixtures.

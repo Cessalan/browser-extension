@@ -12,6 +12,7 @@ import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, r
 
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
 import { countChanges, diffWords, type DiffPart } from './diff';
+import { modeInfo } from '../speedtest/models';
 
 // Made-up examples. Never use real patient data here.
 const EXAMPLE_FR = `Bonjour Dre Tremblay,
@@ -464,7 +465,7 @@ function AiPill({ status }: { status: AiStatus }) {
     default:
       return status.cached === false ? (
         <button type="button" class={`${pill} hover:bg-canvas`} onClick={() => void ai.load().catch(() => {})}>
-          <Download size={13} aria-hidden="true" /> {t('ai.download')}
+          <Download size={13} aria-hidden="true" /> {t('ai.download', { mb: modeInfo(ai.mode).downloadMB })}
         </button>
       ) : (
         <span class={`${pill} text-muted`}>{t('ai.checking')}</span>

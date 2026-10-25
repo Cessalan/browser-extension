@@ -2,12 +2,12 @@ import { useEffect, useState } from 'preact/hooks';
 import { ReviewEmail } from './review/ReviewEmail';
 import { SpeedTest } from './speedtest/SpeedTest';
 import { setLang, useI18n, type Key } from './i18n';
-import { Gauge, Languages, Lock, Mail, RefreshCw, type LucideIcon } from 'lucide-preact';
+import { Settings2, Languages, Lock, Mail, RefreshCw, type LucideIcon } from 'lucide-preact';
 import { useRegisterSW } from 'virtual:pwa-register/preact';
 
 const PAGES: { hash: string; label: Key; icon: LucideIcon; view: () => preact.JSX.Element }[] = [
   { hash: '#/', label: 'nav.review', icon: Mail, view: ReviewEmail },
-  { hash: '#/speed-test', label: 'nav.speedTest', icon: Gauge, view: SpeedTest },
+  { hash: '#/setup', label: 'nav.setup', icon: Settings2, view: SpeedTest },
 ];
 
 function useHash() {
@@ -23,7 +23,8 @@ function useHash() {
 export function App() {
   const hash = useHash();
   const { lang, t } = useI18n();
-  const page = PAGES.find((p) => p.hash === hash) ?? PAGES[0];
+  // '#/speed-test' was the old address of the Setup page.
+  const page = PAGES.find((p) => p.hash === (hash === '#/speed-test' ? '#/setup' : hash)) ?? PAGES[0];
   const View = page.view;
 
   return (
