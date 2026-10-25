@@ -139,7 +139,8 @@ class MockAI extends LocalAI {
     const draft = String(messages.at(-1)?.content ?? '');
     const reply = String(messages[0].content).includes('List up to')
       ? '- The date for the discharge is not stated.\n- Say who will arrange transport.\n- "pending the final PT eval" may be unclear to the family.'
-      : draft.replace(/\bpt\b/gi, 'patient').replace(/thx|thanks/i, 'Thank you');
+      : draft.replace(/\bpt\b/gi, 'the patient').replace(/\bu\b/g, 'you').replace(/\br\b/g, 'are').replace(/thx|thanks/i, 'Thank you,');
+    await new Promise((r) => setTimeout(r, 1500)); // simulate the model thinking before the first word
     let text = '';
     for (const word of reply.split(/(?<=\s)/)) {
       text += word;
