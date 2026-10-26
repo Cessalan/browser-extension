@@ -553,7 +553,8 @@ function AiPill({ status }: { status: AiStatus }) {
     default:
       return status.cached === false ? (
         <button type="button" class={`${pill} hover:bg-canvas`} onClick={() => void ai.load().catch(() => {})}>
-          <Download size={13} aria-hidden="true" /> {t('ai.download', { mb: modeInfo(ai.mode).downloadMB })}
+          <Download size={13} aria-hidden="true" />{' '}
+          {modeInfo(ai.mode).builtin ? t('ai.downloadChrome') : t('ai.download', { mb: modeInfo(ai.mode).downloadMB })}
         </button>
       ) : null;
   }

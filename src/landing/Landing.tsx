@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import {
-  ArrowRight, Brain, Cpu, Briefcase, HeartHandshake, Scale, Stethoscope, CircleCheck, CloudOff, Download, FileSearch, HardDrive, Languages, Lock, MemoryStick, Monitor,
+  ArrowRight, Brain, Cpu, Globe, Briefcase, HeartHandshake, Scale, Stethoscope, CircleCheck, CloudOff, Download, FileSearch, HardDrive, Languages, Lock, MemoryStick, Monitor,
   ShieldCheck, Sparkles, Star, TriangleAlert, UserX, WifiOff, Zap, type LucideIcon,
 } from 'lucide-preact';
 import { setLang, useI18n, type Key } from '../i18n';
 import { ai, useAiStatus } from '../ai/engine';
 import { getDeviceInfo, type DeviceInfo } from '../speedtest/device';
-import { CPU_MODE, GPU_MODES, modeInfo, type AiMode, gpuResetCount } from '../speedtest/models';
-import { isSoftwareGpu, recommendMode } from '../speedtest/recommend';
+import { modeInfo, type AiMode, gpuResetCount } from '../speedtest/models';
+import { isSoftwareGpu, modesFor, recommendMode, shownModeFor } from '../speedtest/recommend';
 
-const MODE_ICONS: Record<AiMode, LucideIcon> = { compat: Cpu, fast: Zap, standard: Star, smart: Brain };
+const MODE_ICONS: Record<AiMode, LucideIcon> = { chrome: Globe, compat: Cpu, fast: Zap, standard: Star, smart: Brain };
 const logo = `${import.meta.env.BASE_URL}icon.svg`;
 
 /**
@@ -259,10 +259,9 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
   }, []);
 
   const recommended = device ? recommendMode(device, undefined, gpuResetCount()) : null;
-  // Without usable graphics only the processor ("Compatible") mode can run.
   const usableGpu = !!device?.webgpu && !isSoftwareGpu(device);
-  const modes = usableGpu ? GPU_MODES : [CPU_MODE];
-  const shownMode: AiMode = usableGpu ? mode : 'compat';
+  const modes = modesFor(device);
+  const shownMode: AiMode = device ? shownModeFor(device, mode) : mode;
   const secure = window.isSecureContext;
   const installed = status.state === 'ready' || (status.state === 'idle' && status.cached === true);
   const size = modeInfo(shownMode).downloadMB;
@@ -297,7 +296,7 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
               {device.memoryGB != null && <Check ok={device.memoryGB >= 8} icon={MemoryStick}>{t('setup.memory', { gb: device.memoryGB })}</Check>}
               {device.storageFreeGB != null && <Check ok={!lowSpace} icon={HardDrive}>{t('setup.space', { gb: device.storageFreeGB })}</Check>}
             </ul>
-            {!usableGpu && <p class="mt-3 text-sm text-muted">{t('land.start.noGpu')}</p>}
+            {!usableGpu && shownMode !== 'chrome' && <p class="mt-3 text-sm text-muted">{t('land.start.noGpu')}</p>}
           </>
         )}
       </div>
@@ -327,7 +326,7 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
                       <Sparkles size={12} aria-hidden="true" /> {t('setup.recommended')}
                     </span>
                   )}
-                  <span class="mt-1 block text-xs text-muted">~{m.downloadMB} {t('setup.mb')}</span>
+                  <span class="mt-1 block text-xs text-muted">{m.builtin ? t('setup.byChrome') : `~${m.downloadMB} ${t('setup.mb')}`}</span>
                 </button>
               );
             })}
