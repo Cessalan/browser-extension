@@ -42,3 +42,13 @@ body {
   height: 0;
   pointer-events: none;
 }
+
+/* Proofreading underlines (src/review/proofread.tsx). */
+.confi-issue { cursor: pointer; text-decoration-line: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; border-radius: 2px; }
+.confi-issue:hover { background: color-mix(in srgb, currentColor 6%, transparent); }
+.confi-issue-spelling { text-decoration-color: #ef4444; }
+.confi-issue-grammar { text-decoration-color: #f59e0b; }
+.confi-issue-shorthand { text-decoration-color: var(--color-brand); text-decoration-style: dotted; }
+.confi-dot-spelling { background: #ef4444; }
+.confi-dot-grammar { background: #f59e0b; }
+.confi-dot-shorthand { background: var(--color-brand); }

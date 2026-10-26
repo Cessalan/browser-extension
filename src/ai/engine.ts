@@ -409,6 +409,18 @@ async function mockGenerate(messages: Message[], onText: (text: string) => void)
   }
   const system = String(messages[0].content);
   const user = String(messages.at(-1)?.content ?? '');
+  if (system.includes('=>')) {
+    // Proofreading: list corrections found in the text, plus one invented one that Confi must reject.
+    const known: [string, string][] = [
+      ['pouvez vous confirmer', 'pouvez-vous confirmer'],
+      ['rappelerait', 'rappellerait'],
+      ['we discussed tuesday', 'we discussed on Tuesday'],
+      ['orders are signed', 'the orders are signed'],
+    ];
+    const lines = known.filter(([wrong]) => user.includes(wrong)).map(([w, r]) => `${w} => ${r}`);
+    await new Promise((r) => setTimeout(r, 400));
+    return lines.length ? [...lines, 'la patiente => le patient'].join('\n') : 'OK';
+  }
   const draft = /<text>\n([\s\S]*)\n<\/text>/.exec(user)?.[1] ?? user;
   const reply = system.includes('List up to')
     ? system.includes('in French')
