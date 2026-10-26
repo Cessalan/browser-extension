@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { GpuLostError, ai, useAiStatus, type AiStatus, type Message } from '../ai/engine';
+import { GpuLostError, ai, useAiStatus, type AiStatus } from '../ai/engine';
 import { Button } from '../ui';
 import { useI18n, type Key, type Lang } from '../i18n';
 import {
@@ -8,7 +8,8 @@ import {
   Info, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
-import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, rewriteMessages, type RewriteId } from './prompts';
+import { REWRITES, parseBullets, reviewMessages, type RewriteId } from './prompts';
+import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
 
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
 import { countChanges, diffWords, type DiffPart } from './diff';
@@ -16,7 +17,6 @@ import { modeInfo, type AiMode } from '../speedtest/models';
 import type { Editor } from '@tiptap/core';
 import { FormatBar, RichEditor, selectText } from './RichEditor';
 import { markdownToHtml, markdownToPlain } from './format';
-import { looksUnrelated } from '../ai/quality';
 
 // Made-up examples. Never use real patient data here.
 const EXAMPLE_FR = `Bonjour Dre Tremblay,
@@ -34,9 +34,10 @@ thx
 Jordan` };
 
 type Review = { kind: 'review'; text: string; done: boolean; forDraft: string; startedAt: number };
-// `checkRelevance`: built-in rewrites keep the text's language, so a reply sharing almost no words with it is discarded.
-type Rewrite = { kind: 'rewrite'; label: string; original: string; text: string; done: boolean; startedAt: number; checkRelevance?: boolean };
+type Rewrite = { kind: 'rewrite'; label: string; original: string; text: string; done: boolean; startedAt: number };
 type Task = Review | Rewrite;
+/** Runs one AI request, streaming the text so far; returns the final text. */
+type Exec = (onText: (text: string) => void) => Promise<string>;
 
 export function ReviewEmail() {
   // The draft as Markdown (what the AI reads); the editor shows it as rich text.
@@ -48,7 +49,7 @@ export function ReviewEmail() {
   const [switchedTo, setSwitchedTo] = useState<AiMode | null>(null);
   useEffect(() => ai.onFallback(setSwitchedTo), []);
   // The last AI request, so "Try again" can repeat it.
-  const lastRun = useRef<{ next: Task; messages: Message[]; maxTokens: number } | null>(null);
+  const lastRun = useRef<{ next: Task; exec: Exec } | null>(null);
   const [copied, setCopied] = useState(false);
   const [instruction, setInstruction] = useState('');
   const status = useAiStatus();
@@ -115,36 +116,40 @@ export function ReviewEmail() {
     setEditorContent(next);
   }
 
-  async function run(next: Task, messages: Message[], maxTokens: number) {
+  async function run(next: Task, exec: Exec) {
     setError(null);
-    lastRun.current = { next, messages, maxTokens };
+    lastRun.current = { next, exec };
     setTask(next);
     try {
-      const text = await ai.generate(messages, (t) => setTask((cur) => cur && { ...cur, text: t }), maxTokens);
-      const result = next.kind === 'rewrite' ? cleanRewrite(text) : text;
-      if (next.kind === 'rewrite' && next.checkRelevance && looksUnrelated(markdownToPlain(next.original), markdownToPlain(result))) {
-        // The model ignored the text (it happens with the smallest modes): don't show nonsense.
-        setTask(null);
-        setError({ text: '', unreliable: true });
-        return;
-      }
-      setTask((cur) => cur && { ...cur, text: result, done: true });
+      const text = await exec((t) => setTask((cur) => cur && { ...cur, text: t }));
+      setTask((cur) => cur && { ...cur, text, done: true });
     } catch (err) {
       setTask(null);
-      setError(err instanceof GpuLostError ? { text: '', gpuLost: true } : { text: err instanceof Error ? err.message : String(err) });
+      if (err instanceof GpuLostError) setError({ text: '', gpuLost: true });
+      // The model ignored the text or dropped a protected detail (it happens with the smallest modes).
+      else if (err instanceof UnreliableError) setError({ text: '', unreliable: true });
+      else setError({ text: err instanceof Error ? err.message : String(err) });
     }
+  }
+
+  function retry() {
+    const last = lastRun.current;
+    setError(null);
+    if (last) void run({ ...last.next, text: '', done: false, startedAt: Date.now() }, last.exec);
   }
 
   function review() {
     if (!plain.trim() || running) return;
-    void run({ kind: 'review', text: '', done: false, forDraft: draft, startedAt: Date.now() }, reviewMessages(plain, lang), 300);
+    void run({ kind: 'review', text: '', done: false, forDraft: draft, startedAt: Date.now() }, (onText) =>
+      ai.generate(reviewMessages(plain, lang), onText, 300),
+    );
   }
 
-  /** `original` is what the diff compares against; `messages` may target a previous suggestion when refining. */
-  function rewrite(label: string, original: string, messages: Message[], checkRelevance = false) {
-    // A rewrite is about as long as its input; leave room so it never stops mid-sentence.
-    const maxTokens = Math.min(2000, Math.max(300, countWords(String(messages.at(-1)?.content ?? '')) * 2 + 150));
-    void run({ kind: 'rewrite', label, original, text: '', done: false, startedAt: Date.now(), checkRelevance }, messages, maxTokens);
+  /** `original` is what the diff compares against; `input` is what gets rewritten (a previous suggestion when refining). */
+  function rewrite(label: string, original: string, job: RewriteJob, input = original) {
+    void run({ kind: 'rewrite', label, original, text: '', done: false, startedAt: Date.now() }, (onText) =>
+      rewriteText(job, input, onText).then((r) => r.text),
+    );
   }
 
   // With a suggestion on screen, the instruction box refines that suggestion; otherwise it edits the draft.
@@ -155,9 +160,9 @@ export function ReviewEmail() {
     if (!text || running) return;
     if (task?.kind === 'rewrite' && task.done) {
       // Keep diffing against the user's original email.
-      rewrite(quote(text, lang), task.original, customMessages(text, task.text));
+      rewrite(quote(text, lang), task.original, { instruction: text }, task.text);
     } else if (plain.trim()) {
-      rewrite(quote(text, lang), draft, customMessages(text, draft));
+      rewrite(quote(text, lang), draft, { instruction: text });
     } else {
       return;
     }
@@ -190,7 +195,7 @@ export function ReviewEmail() {
         <span class="mx-1 hidden h-6 w-px bg-line sm:block" />
         <span class="px-1 text-xs font-medium uppercase tracking-wide text-muted">{t('review.rewrite')}</span>
         {REWRITES.map((r) => (
-          <Button key={r.id} variant="secondary" icon={REWRITE_ICONS[r.id]} onClick={() => rewrite(t(r.label), draft, rewriteMessages(r.id, draft), true)} disabled={!canAct}>
+          <Button key={r.id} variant="secondary" icon={REWRITE_ICONS[r.id]} onClick={() => rewrite(t(r.label), draft, { id: r.id })} disabled={!canAct}>
             {t(r.label)}
           </Button>
         ))}
@@ -221,11 +226,7 @@ export function ReviewEmail() {
             setError(null);
             void ai.setMode('compat');
           }}
-          onRetry={() => {
-            const last = lastRun.current;
-            setError(null);
-            if (last) void run({ ...last.next, text: '', done: false, startedAt: Date.now() }, last.messages, last.maxTokens);
-          }}
+          onRetry={retry}
         />
       ) : error?.unreliable ? (
         <section class="flex gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm" role="status">
@@ -235,11 +236,7 @@ export function ReviewEmail() {
             <div class="mt-3 flex flex-wrap items-center gap-3">
               <Button
                 variant="secondary"
-                onClick={() => {
-                  const last = lastRun.current;
-                  setError(null);
-                  if (last) void run({ ...last.next, text: '', done: false, startedAt: Date.now() }, last.messages, last.maxTokens);
-                }}
+                onClick={retry}
               >
                 {t('ai.gpuLost.retry')}
               </Button>
