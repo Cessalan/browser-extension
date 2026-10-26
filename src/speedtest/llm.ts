@@ -59,3 +59,46 @@ export async function runLlmTest(
     worker.terminate();
   }
 }
+
+/**
+ * Speed test for "Compatible" (processor) mode, run through the shared AI engine.
+ * The CPU engine doesn't report token counts, so speed is estimated from characters (~4 per token).
+ */
+export async function runCpuTest(onProgress: (fraction: number) => void): Promise<LlmResult> {
+  const { ai } = await import('../ai/engine');
+  const { CPU_MODE } = await import('./models');
+  const wasCached = ai.status.state === 'ready' || (ai.status.state === 'idle' && ai.status.cached === true);
+  const unsubscribe = ai.subscribe((s) => s.state === 'loading' && onProgress(s.fraction));
+  const t0 = performance.now();
+  try {
+    await ai.load();
+  } finally {
+    unsubscribe();
+  }
+  const loadSeconds = (performance.now() - t0) / 1000;
+  onProgress(1);
+
+  const t1 = performance.now();
+  let first = 0;
+  const output = await ai.generate(
+    [
+      { role: 'system', content: 'You review a short professional email. Reply with 3 short bullet points: what is unclear, what is missing, and one suggested fix.' },
+      { role: 'user', content: SAMPLE_EMAIL },
+    ],
+    (text) => {
+      if (!first && text) first = performance.now();
+    },
+    120,
+  );
+  const end = performance.now();
+  const writingSeconds = Math.max(0.1, (end - (first || t1)) / 1000);
+  return {
+    modelId: CPU_MODE.modelId,
+    wasCached,
+    loadSeconds,
+    firstTokenSeconds: ((first || end) - t1) / 1000,
+    tokensPerSecond: output.length / 4 / writingSeconds,
+    totalSeconds: (end - t1) / 1000,
+    output,
+  };
+}

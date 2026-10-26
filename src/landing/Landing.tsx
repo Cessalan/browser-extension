@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import {
-  ArrowRight, Brain, Briefcase, HeartHandshake, Scale, Stethoscope, CircleCheck, CloudOff, Download, FileSearch, HardDrive, Languages, Lock, MemoryStick, Monitor,
+  ArrowRight, Brain, Cpu, Briefcase, HeartHandshake, Scale, Stethoscope, CircleCheck, CloudOff, Download, FileSearch, HardDrive, Languages, Lock, MemoryStick, Monitor,
   ShieldCheck, Sparkles, Star, TriangleAlert, UserX, WifiOff, Zap, type LucideIcon,
 } from 'lucide-preact';
 import { setLang, useI18n, type Key } from '../i18n';
 import { ai, useAiStatus } from '../ai/engine';
 import { getDeviceInfo, type DeviceInfo } from '../speedtest/device';
-import { AI_MODES, modeInfo, type AiMode } from '../speedtest/models';
+import { CPU_MODE, GPU_MODES, modeInfo, type AiMode } from '../speedtest/models';
 import { isSoftwareGpu, recommendMode } from '../speedtest/recommend';
 
-const MODE_ICONS: Record<AiMode, LucideIcon> = { fast: Zap, standard: Star, smart: Brain };
+const MODE_ICONS: Record<AiMode, LucideIcon> = { compat: Cpu, fast: Zap, standard: Star, smart: Brain };
 const logo = `${import.meta.env.BASE_URL}icon.svg`;
 
 /**
@@ -259,8 +259,13 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
   }, []);
 
   const recommended = device ? recommendMode(device) : null;
+  // Without usable graphics only the processor ("Compatible") mode can run.
+  const usableGpu = !!device?.webgpu && !isSoftwareGpu(device);
+  const modes = usableGpu ? GPU_MODES : [CPU_MODE];
+  const shownMode: AiMode = usableGpu ? mode : 'compat';
+  const secure = window.isSecureContext;
   const installed = status.state === 'ready' || (status.state === 'idle' && status.cached === true);
-  const size = modeInfo(mode).downloadMB;
+  const size = modeInfo(shownMode).downloadMB;
   const lowSpace = device?.storageFreeGB != null && device.storageFreeGB * 1000 < size * 1.5;
 
   function choose(m: AiMode) {
@@ -275,31 +280,36 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
         <p class="text-sm font-medium text-muted">{t('land.start.step1')}</p>
         {!device ? (
           <p class="mt-2">{t('setup.checking')}</p>
-        ) : !device.webgpu ? (
+        ) : !secure ? (
           <div class="mt-3 flex gap-3 rounded-xl bg-red-50 p-4 text-sm">
             <TriangleAlert size={20} class="shrink-0 text-bad" aria-hidden="true" />
             <div>
-              <p class="font-medium text-bad">{t('setup.notSupported')}</p>
-              <p class="mt-1 text-ink/80">{t('land.start.unsupportedHelp')}</p>
+              <p class="font-medium text-bad">{t('land.start.insecure')}</p>
+              <a class="mt-1 inline-block font-medium text-brand underline" href={location.href.replace(/^http:/, 'https:')}>
+                {t('land.start.openSecure')}
+              </a>
             </div>
           </div>
         ) : (
-          <ul class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-            <Check ok={!isSoftwareGpu(device)} icon={Monitor}>{t('setup.graphics')}</Check>
-            {device.memoryGB != null && <Check ok={device.memoryGB >= 8} icon={MemoryStick}>{t('setup.memory', { gb: device.memoryGB })}</Check>}
-            {device.storageFreeGB != null && <Check ok={!lowSpace} icon={HardDrive}>{t('setup.space', { gb: device.storageFreeGB })}</Check>}
-          </ul>
+          <>
+            <ul class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+              <Check ok={usableGpu} icon={Monitor}>{t('setup.graphics')}</Check>
+              {device.memoryGB != null && <Check ok={device.memoryGB >= 8} icon={MemoryStick}>{t('setup.memory', { gb: device.memoryGB })}</Check>}
+              {device.storageFreeGB != null && <Check ok={!lowSpace} icon={HardDrive}>{t('setup.space', { gb: device.storageFreeGB })}</Check>}
+            </ul>
+            {!usableGpu && <p class="mt-3 text-sm text-muted">{t('land.start.noGpu')}</p>}
+          </>
         )}
       </div>
 
       {/* Step 2: mode */}
-      {device?.webgpu && (
+      {device && secure && (
         <div class="border-b border-line p-6">
           <p class="text-sm font-medium text-muted">{t('land.start.step2')}</p>
           <div class="mt-3 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label={t('setup.mode')}>
-            {AI_MODES.map((m) => {
+            {modes.map((m) => {
               const Icon = MODE_ICONS[m.mode];
-              const selected = m.mode === mode;
+              const selected = m.mode === shownMode;
               return (
                 <button
                   type="button"
@@ -326,7 +336,7 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
       )}
 
       {/* Step 3: download, then open */}
-      {device?.webgpu && (
+      {device && secure && (
         <div class="p-6">
           {installed ? (
             <div class="flex flex-wrap items-center gap-4">

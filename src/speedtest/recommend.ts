@@ -1,6 +1,7 @@
 import type { DeviceInfo } from './device';
 import type { AiMode } from './models';
 
+/** GPU modes, lightest first. "compat" (CPU) sits outside this ladder: it's for computers without usable graphics. */
 export const MODE_ORDER: AiMode[] = ['fast', 'standard', 'smart'];
 const ORDER = MODE_ORDER;
 const step = (mode: AiMode, by: number) => ORDER[Math.min(ORDER.length - 1, Math.max(0, ORDER.indexOf(mode) + by))];
@@ -10,7 +11,10 @@ const step = (mode: AiMode, by: number) => ORDER[Math.min(ORDER.length - 1, Math
  * speed test has run, from how fast it actually was, since specs alone can mislead.
  */
 export function recommendMode(device: DeviceInfo, measured?: { mode: AiMode; tokensPerSecond: number }): AiMode {
-  if (measured) {
+  // No usable graphics (none, software-only, or the page can't use it): the CPU mode is the only one that runs.
+  if (!device.webgpu || isSoftwareGpu(device)) return 'compat';
+
+  if (measured && measured.mode !== 'compat') {
     const tps = measured.tokensPerSecond;
     if (tps < 6) return step(measured.mode, -1); // too slow to read along: go lighter
     if (tps < 12) return measured.mode === 'smart' ? 'standard' : measured.mode;
@@ -18,8 +22,8 @@ export function recommendMode(device: DeviceInfo, measured?: { mode: AiMode; tok
     return measured.mode;
   }
 
-  // Software graphics (no real GPU), older GPUs without 16-bit support, little memory or disk: stay light.
-  if (!device.webgpu || isSoftwareGpu(device) || !device.shaderF16) return 'fast';
+  // Older GPUs without 16-bit support, little memory or disk: stay light.
+  if (!device.shaderF16) return 'fast';
   if ((device.memoryGB ?? 8) < 8 || (device.storageFreeGB ?? 10) < 2) return 'fast';
   // "Smarter" is only suggested after a speed test proves the computer can handle it.
   return 'standard';

@@ -1,8 +1,11 @@
 import type { ChatCompletionMessageParam, WebWorkerMLCEngine } from '@mlc-ai/web-llm';
 import { useEffect, useState } from 'preact/hooks';
-import { DEFAULT_MODE, chatOptions, extraBody, fallbackModelId, loadSavedMode, modeInfo, resolveModelId, saveMode, type AiMode } from '../speedtest/models';
+import {
+  CPU_MODE, DEFAULT_MODE, chatOptions, extraBody, fallbackModelId, loadSavedMode, modeInfo, resolveModelId, saveMode, type AiMode,
+} from '../speedtest/models';
 import { getDeviceInfo } from '../speedtest/device';
 import { recommendMode } from '../speedtest/recommend';
+import type { CpuMessage, CpuRequest } from './cpu.worker';
 
 export type AiStatus =
   | { state: 'idle'; cached: boolean | null }
@@ -12,20 +15,134 @@ export type AiStatus =
 
 export type Message = ChatCompletionMessageParam;
 
+type Progress = (fraction: number, text: string) => void;
+
+/** What the app needs from a running model, whichever hardware it runs on. */
+interface Backend {
+  /** Which hardware is doing the work (shown nowhere in the UI; used for decisions and support). */
+  kind: 'gpu' | 'cpu';
+  generate(messages: Message[], onText: (text: string) => void, maxTokens: number): Promise<string>;
+  stop(): void;
+  unload(): Promise<void>;
+}
+
+/** Graphics card: WebLLM on WebGPU. Tries the mode's model, then a widely compatible fallback. */
+async function startGpu(primary: string, fallback: string, onProgress: Progress): Promise<Backend> {
+  const { CreateWebWorkerMLCEngine } = await import('@mlc-ai/web-llm');
+  const start = async (modelId: string) => {
+    const worker = new Worker(new URL('./llm.worker.ts', import.meta.url), { type: 'module' });
+    try {
+      return await CreateWebWorkerMLCEngine(
+        worker,
+        modelId,
+        { initProgressCallback: (p) => onProgress(p.progress, p.text) },
+        chatOptions(modelId),
+      );
+    } catch (err) {
+      worker.terminate();
+      throw err;
+    }
+  };
+  let engine: WebWorkerMLCEngine;
+  let modelId = primary;
+  try {
+    engine = await start(primary);
+  } catch (err) {
+    if (primary === fallback) throw err;
+    console.warn(`${primary} failed to start, falling back to ${fallback}`, err);
+    engine = await start(fallback);
+    modelId = fallback;
+  }
+  return {
+    kind: 'gpu',
+    async generate(messages, onText, maxTokens) {
+      const stream = await engine.chat.completions.create({
+        messages,
+        stream: true,
+        max_tokens: maxTokens,
+        temperature: 0.3,
+        extra_body: extraBody(modelId),
+      });
+      let text = '';
+      for await (const chunk of stream) {
+        text += chunk.choices[0]?.delta?.content ?? '';
+        onText(text);
+      }
+      return text;
+    },
+    stop: () => engine.interruptGenerate(),
+    unload: () => engine.unload(),
+  };
+}
+
+/** Processor only: transformers.js on WebAssembly, for computers without usable graphics. */
+async function startCpu(modelId: string, onProgress: Progress): Promise<Backend> {
+  const worker = new Worker(new URL('./cpu.worker.ts', import.meta.url), { type: 'module' });
+  const send = (m: CpuRequest) => worker.postMessage(m);
+  let onMessage: (m: CpuMessage) => void = () => {};
+  worker.onmessage = (e: MessageEvent<CpuMessage>) => onMessage(e.data);
+
+  await new Promise<void>((resolve, reject) => {
+    onMessage = (m) => {
+      if (m.type === 'progress') onProgress(m.fraction, '');
+      else if (m.type === 'ready') resolve();
+      else if (m.type === 'error') reject(new Error(m.message));
+    };
+    worker.onerror = (e) => reject(new Error(e.message));
+    send({ type: 'load', modelId });
+  }).catch((err) => {
+    worker.terminate();
+    throw err;
+  });
+
+  let busy: Promise<unknown> = Promise.resolve();
+  return {
+    kind: 'cpu',
+    generate(messages, onText, maxTokens) {
+      // One request at a time: the worker holds a single model.
+      const run = busy.then(
+        () =>
+          new Promise<string>((resolve, reject) => {
+            onMessage = (m) => {
+              if (m.type === 'text') onText(m.text);
+              else if (m.type === 'done') resolve(m.text);
+              else if (m.type === 'error') reject(new Error(m.message));
+            };
+            send({ type: 'generate', messages: messages.map((m) => ({ role: m.role, content: String(m.content) })), maxTokens });
+          }),
+      );
+      busy = run.catch(() => {});
+      return run;
+    },
+    stop: () => send({ type: 'interrupt' }),
+    unload: async () => worker.terminate(),
+  };
+}
+
+/** True if the CPU model's files are already in the browser cache (transformers.js keeps them in Cache Storage). */
+async function cpuModelCached(modelId: string) {
+  try {
+    const cache = await caches.open('transformers-cache');
+    return (await cache.keys()).some((r) => r.url.includes(modelId) && r.url.includes('.onnx'));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The on-device text model, shared by the whole app. Loaded once per tab, in a Web Worker.
+ * Runs on the graphics card when possible, otherwise on the processor ("Compatible" mode).
  * The download happens only the first time; after that it loads from the browser cache.
  */
 class LocalAI {
   status: AiStatus = { state: 'idle', cached: null };
-  /** Faster / Standard / Smarter: the user's saved choice, or else what suits this computer (see resolveMode). */
+  /** Compatible / Faster / Standard / Smarter: the user's saved choice, or else what suits this computer. */
   mode: AiMode = loadSavedMode() ?? DEFAULT_MODE;
   /** True when the user picked the mode themselves; otherwise Confi picks from the computer's specs. */
   chosen = loadSavedMode() !== null;
   private modeResolved: Promise<AiMode> | null = null;
-  private engine: Promise<WebWorkerMLCEngine> | null = null;
-  private loadedModelId: string | null = null;
-  private modelIds: Promise<{ primary: string; fallback: string }> | null = null;
+  private engine: Promise<Backend> | null = null;
+  private modelIds: Promise<{ primary: string; fallback: string } | null> | null = null;
   private listeners = new Set<(s: AiStatus) => void>();
 
   subscribe(fn: (s: AiStatus) => void) {
@@ -48,7 +165,6 @@ class LocalAI {
     const engine = this.engine;
     this.engine = null;
     this.modelIds = null;
-    this.loadedModelId = null;
     this.set({ state: 'idle', cached: null });
     await (await engine?.catch(() => null))?.unload().catch(() => {});
     void this.checkCached();
@@ -64,12 +180,11 @@ class LocalAI {
     return this.modeResolved;
   }
 
-  /** Picks the model for the current mode, using the 32-bit build on GPUs without 16-bit support. */
-  private getModelIds() {
+  /** GPU model ids for the current mode (32-bit builds on GPUs without 16-bit support), or null without WebGPU. */
+  private getGpuModelIds() {
     this.modelIds ??= (async () => {
-      await this.resolveMode();
       const adapter = await navigator.gpu?.requestAdapter().catch(() => null);
-      if (!adapter) throw new Error('This browser has no WebGPU. Use an up-to-date Chrome or Edge.');
+      if (!adapter) return null;
       const f16 = adapter.features.has('shader-f16');
       return { primary: resolveModelId(modeInfo(this.mode).modelId, f16), fallback: fallbackModelId(f16) };
     })();
@@ -78,47 +193,46 @@ class LocalAI {
 
   async checkCached() {
     if (this.status.state !== 'idle') return;
+    let cached = false;
     try {
-      const { hasModelInCache } = await import('@mlc-ai/web-llm');
-      const { primary, fallback } = await this.getModelIds();
-      const cached = (await hasModelInCache(primary)) || (await hasModelInCache(fallback));
-      if (this.status.state === 'idle') this.set({ state: 'idle', cached });
+      const mode = await this.resolveMode();
+      if (modeInfo(mode).cpu) {
+        cached = await cpuModelCached(CPU_MODE.modelId);
+      } else {
+        const ids = await this.getGpuModelIds();
+        if (ids) {
+          const { hasModelInCache } = await import('@mlc-ai/web-llm');
+          cached = (await hasModelInCache(ids.primary)) || (await hasModelInCache(ids.fallback));
+        }
+      }
     } catch {
-      if (this.status.state === 'idle') this.set({ state: 'idle', cached: false });
+      cached = false;
     }
+    if (this.status.state === 'idle') this.set({ state: 'idle', cached });
   }
 
-  load(): Promise<WebWorkerMLCEngine> {
+  load(): Promise<Backend> {
     this.engine ??= (async () => {
       this.set({ state: 'loading', fraction: 0, text: 'Starting…' });
       await navigator.storage?.persist?.().catch(() => false);
-      const [{ CreateWebWorkerMLCEngine }, { primary, fallback }] = await Promise.all([import('@mlc-ai/web-llm'), this.getModelIds()]);
-      const start = async (modelId: string) => {
-        const worker = new Worker(new URL('./llm.worker.ts', import.meta.url), { type: 'module' });
+      const onProgress: Progress = (fraction, text) => this.set({ state: 'loading', fraction, text });
+      const mode = await this.resolveMode();
+      let backend: Backend;
+      if (modeInfo(mode).cpu) {
+        backend = await startCpu(CPU_MODE.modelId, onProgress);
+      } else {
+        const ids = await this.getGpuModelIds();
         try {
-          return await CreateWebWorkerMLCEngine(
-            worker,
-            modelId,
-            { initProgressCallback: (p) => this.set({ state: 'loading', fraction: p.progress, text: p.text }) },
-            chatOptions(modelId),
-          );
+          if (!ids) throw new Error('No WebGPU');
+          backend = await startGpu(ids.primary, ids.fallback, onProgress);
         } catch (err) {
-          worker.terminate();
-          throw err;
+          // Graphics unavailable or failing: the processor still works, just slower.
+          console.warn('Graphics AI unavailable, using the processor instead', err);
+          backend = await startCpu(CPU_MODE.modelId, onProgress);
         }
-      };
-      let engine: WebWorkerMLCEngine;
-      try {
-        engine = await start(primary);
-        this.loadedModelId = primary;
-      } catch (err) {
-        if (primary === fallback) throw err;
-        console.warn(`${primary} failed to start, falling back to ${fallback}`, err);
-        engine = await start(fallback);
-        this.loadedModelId = fallback;
       }
       this.set({ state: 'ready' });
-      return engine;
+      return backend;
     })().catch((err) => {
       this.engine = null;
       this.set({ state: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -129,24 +243,12 @@ class LocalAI {
 
   /** Streams a reply. `onText` receives the full text so far. */
   async generate(messages: Message[], onText: (text: string) => void, maxTokens = 1024): Promise<string> {
-    const engine = await this.load();
-    const stream = await engine.chat.completions.create({
-      messages,
-      stream: true,
-      max_tokens: maxTokens,
-      temperature: 0.3,
-      extra_body: this.loadedModelId ? extraBody(this.loadedModelId) : undefined,
-    });
-    let text = '';
-    for await (const chunk of stream) {
-      text += chunk.choices[0]?.delta?.content ?? '';
-      onText(text);
-    }
-    return text;
+    const backend = await this.load();
+    return backend.generate(messages, onText, maxTokens);
   }
 
   async stop() {
-    (await this.engine)?.interruptGenerate();
+    (await this.engine?.catch(() => null))?.stop();
   }
 }
 
@@ -170,7 +272,7 @@ class MockAI extends LocalAI {
 
   load() {
     this.set({ state: 'ready' });
-    return Promise.resolve(null as unknown as WebWorkerMLCEngine);
+    return Promise.resolve(null as unknown as Backend);
   }
 
   async generate(messages: Message[], onText: (text: string) => void) {

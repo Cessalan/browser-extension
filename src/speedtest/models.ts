@@ -1,19 +1,25 @@
 /**
- * What people choose between. They see "Faster / Standard / Smarter", never model names.
- * Sizes are approximate one-time downloads (4-bit versions).
+ * What people choose between. They see "Faster / Standard / Smarter" (or "Compatible"), never model names.
+ * Sizes are approximate one-time downloads.
+ * GPU modes run on WebLLM (WebGPU). "Compatible" runs on the CPU (transformers.js / WebAssembly) for
+ * computers without usable graphics: no GPU, virtual desktops, graphics acceleration turned off.
  */
-export type AiMode = 'fast' | 'standard' | 'smart';
+export type AiMode = 'compat' | 'fast' | 'standard' | 'smart';
 
-export const AI_MODES: { mode: AiMode; modelId: string; downloadMB: number }[] = [
+export const AI_MODES: { mode: AiMode; modelId: string; downloadMB: number; cpu?: true }[] = [
+  { mode: 'compat', modelId: 'onnx-community/Qwen2.5-0.5B-Instruct', downloadMB: 500, cpu: true },
   { mode: 'fast', modelId: 'Qwen3-0.6B-q4f16_1-MLC', downloadMB: 400 },
   { mode: 'standard', modelId: 'gemma3-1b-it-q4f16_1-MLC', downloadMB: 700 },
   { mode: 'smart', modelId: 'Qwen3-1.7B-q4f16_1-MLC', downloadMB: 1100 },
 ];
 
+export const GPU_MODES = AI_MODES.filter((m) => !m.cpu);
+export const CPU_MODE = AI_MODES.find((m) => m.cpu)!;
+
 export const DEFAULT_MODE: AiMode = 'standard';
 
 export function modeInfo(mode: AiMode) {
-  return AI_MODES.find((m) => m.mode === mode) ?? AI_MODES[1];
+  return AI_MODES.find((m) => m.mode === mode) ?? AI_MODES.find((m) => m.mode === DEFAULT_MODE)!;
 }
 
 const MODE_KEY = 'aiMode';
