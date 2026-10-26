@@ -212,10 +212,13 @@ export function SpeedTest() {
           </dl>
           {llm?.output && <pre class="mt-3 whitespace-pre-wrap rounded-lg bg-canvas p-3 text-xs">{llm.output}</pre>}
           {stt?.text && <p class="mt-2 rounded-lg bg-canvas p-3 text-xs">“{stt.text}”</p>}
-          <div class="mt-4">
+          <div class="mt-4 flex flex-wrap items-center">
             <Button onClick={copyReport} variant="secondary" icon={copied ? Check : Copy}>
               {copied ? t('editor.copied') : t('setup.copy')}
             </Button>
+            <a href="#/bench" class="ml-3 text-sm text-brand hover:underline">
+              {t('bench.link')}
+            </a>
           </div>
         </details>
       )}

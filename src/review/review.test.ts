@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findSensitive } from './sensitive';
-import { cleanRewrite, customMessages, parseBullets, reviewMessages, rewriteMessages } from './prompts';
+import { cleanRewrite, customMessages, detectTextLang, parseBullets, reviewMessages, rewriteMessages } from './prompts';
 
 // All example data below is made up.
 describe('findSensitive', () => {
@@ -25,8 +25,17 @@ describe('findSensitive', () => {
 });
 
 describe('prompts', () => {
-  it('asks the model to keep the email language', () => {
-    expect(rewriteMessages('shorter', 'Bonjour')[0].content).toContain('same language as the text');
+  it('speaks to the model in the text’s language, with a worked example', () => {
+    const fr = rewriteMessages('fix', 'bonjour, pouvez vous confirmer la date pour le patient');
+    expect(fr[0].content).toContain('Corrige l’orthographe');
+    expect(fr.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'user']);
+    expect(fr[3].content).toContain('<text>\nbonjour, pouvez vous confirmer la date pour le patient\n</text>');
+    expect(rewriteMessages('fix', 'hi, can you confirm the date for the patient')[0].content).toContain('Fix the spelling');
+  });
+
+  it('detects English and French', () => {
+    expect(detectTextLang('Bonjour, le patient est prêt pour le congé.')).toBe('fr');
+    expect(detectTextLang('Hi, the patient is ready for discharge.')).toBe('en');
   });
 
   it('includes the user instruction and the email', () => {

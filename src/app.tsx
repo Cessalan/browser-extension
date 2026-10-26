@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { ReviewEmail } from './review/ReviewEmail';
 import { SpeedTest } from './speedtest/SpeedTest';
 import { Landing } from './landing/Landing';
+import { Bench } from './bench/Bench';
 import { setLang, useI18n } from './i18n';
 import { ArrowLeft, Languages, RefreshCw, Settings2 } from 'lucide-preact';
 import { useRegisterSW } from 'virtual:pwa-register/preact';
@@ -11,6 +12,7 @@ const PAGES: Record<string, () => preact.JSX.Element> = {
   '#/': ReviewEmail,
   '#/setup': SpeedTest,
   '#/speed-test': SpeedTest, // old address of Setup
+  '#/bench': Bench, // quality bench, linked from Setup's technical details
 };
 
 const ONBOARDED_KEY = 'onboarded';
@@ -39,7 +41,8 @@ function useHash() {
 export function App() {
   const hash = useHash();
   const { lang, t } = useI18n();
-  const onSetup = PAGES[hash] === SpeedTest;
+  const page = PAGES[hash];
+  const onSetup = page === SpeedTest || page === Bench;
   const onLanding = hash === '#/welcome';
 
   function openApp() {
@@ -94,7 +97,8 @@ export function App() {
         <div hidden={onSetup}>
           <ReviewEmail />
         </div>
-        {onSetup && <SpeedTest />}
+        {page === SpeedTest && <SpeedTest />}
+        {page === Bench && <Bench />}
       </main>
       <footer class="mx-auto flex max-w-5xl gap-4 px-4 pb-6 text-xs text-muted">
         <span>{t('app.version', { v: __APP_VERSION__ })}</span>
