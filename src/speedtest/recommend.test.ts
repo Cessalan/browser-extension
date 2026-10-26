@@ -18,8 +18,14 @@ describe('recommendMode from specs', () => {
     expect(recommendMode(strong)).toBe('standard');
   });
 
-  it('picks Faster for weak or software graphics, low memory or low disk', () => {
-    expect(recommendMode({ ...strong, gpu: 'google swiftshader' })).toBe('fast');
+  it('picks Compatible (CPU) when there is no usable graphics', () => {
+    expect(recommendMode({ ...strong, webgpu: false, gpu: null })).toBe('compat');
+    expect(recommendMode({ ...strong, gpu: 'google swiftshader' })).toBe('compat');
+    expect(recommendMode({ ...strong, gpu: 'microsoft basic render driver' })).toBe('compat');
+    expect(recommendMode({ ...strong, webgpu: false }, { mode: 'compat', tokensPerSecond: 3 })).toBe('compat');
+  });
+
+  it('picks Faster for older graphics, low memory or low disk', () => {
     expect(recommendMode({ ...strong, shaderF16: false })).toBe('fast');
     expect(recommendMode({ ...strong, memoryGB: 4 })).toBe('fast');
     expect(recommendMode({ ...strong, storageFreeGB: 1 })).toBe('fast');

@@ -14,7 +14,7 @@ describe('models', () => {
   });
 
   it('maps every AI mode to a model with a 32-bit fallback', () => {
-    for (const { modelId } of AI_MODES) expect(resolveModelId(modelId, false)).toContain('q4f32');
+    for (const { modelId, cpu } of AI_MODES) if (!cpu) expect(resolveModelId(modelId, false)).toContain('q4f32');
     expect(modeInfo('standard').modelId).toContain('gemma3');
   });
 

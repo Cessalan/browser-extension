@@ -31,17 +31,14 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
-      workbox: {
+      // Our own service worker (src/sw.ts): it also makes the page cross-origin isolated (see the file).
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
         // Precache the small app shell. The AI engines (large) are cached the first time they're used.
         // Model weights are cached separately by the AI libraries themselves.
         globPatterns: ['**/*.{css,html,svg,ico}', 'favicon-32.png', 'assets/index-*.js'],
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.origin === self.location.origin && /\/assets\/.+\.(js|wasm|mjs)$/.test(url.pathname),
-            handler: 'CacheFirst',
-            options: { cacheName: 'ai-engines' },
-          },
-        ],
       },
     }),
   ],

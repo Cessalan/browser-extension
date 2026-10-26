@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import {
-  Brain, Check, ChevronRight, CircleCheck, CircleX, Copy, HardDrive, MemoryStick, Mic, Monitor, MonitorCheck, ShieldCheck, Sparkles,
+  Brain, Check, Cpu, ChevronRight, CircleCheck, CircleX, Copy, HardDrive, MemoryStick, Mic, Monitor, MonitorCheck, ShieldCheck, Sparkles,
   Star, TriangleAlert, UserX, WifiOff, Zap, type LucideIcon,
 } from 'lucide-preact';
 import { Button, Card, ProgressBar, type Progress } from '../ui';
@@ -10,11 +10,11 @@ import { ai } from '../ai/engine';
 import { getDeviceInfo, type DeviceInfo } from './device';
 import type { LlmResult } from './llm';
 import type { SttResult } from './stt';
-import { AI_MODES, modeInfo, resolveModelId, type AiMode } from './models';
+import { CPU_MODE, GPU_MODES, modeInfo, resolveModelId, type AiMode } from './models';
 import { formatReport, llmVerdict, sttVerdict, type Verdict } from './report';
 import { MODE_ORDER, isSoftwareGpu, recommendMode } from './recommend';
 
-const MODE_ICONS: Record<AiMode, LucideIcon> = { fast: Zap, standard: Star, smart: Brain };
+const MODE_ICONS: Record<AiMode, LucideIcon> = { compat: Cpu, fast: Zap, standard: Star, smart: Brain };
 
 /**
  * "Setup" page: is this computer ready, and which AI mode to use.
@@ -49,6 +49,11 @@ export function SpeedTest() {
     void ai.setMode(next);
   }
 
+  // Without usable graphics only the processor ("Compatible") mode can run.
+  const usableGpu = !!device?.webgpu && !isSoftwareGpu(device);
+  const modes = usableGpu ? GPU_MODES : [CPU_MODE];
+  const shownMode: AiMode = usableGpu ? mode : 'compat';
+
   async function testLlm() {
     if (!device) return;
     setError(null);
@@ -57,10 +62,13 @@ export function SpeedTest() {
     setLlmProgress({ fraction: 0, text: t('setup.starting') });
     try {
       // Loaded on demand so the app itself opens instantly.
-      const { runLlmTest } = await import('./llm');
-      const modelId = resolveModelId(modeInfo(mode).modelId, device.shaderF16);
-      const result = await runLlmTest(modelId, (fraction) => setLlmProgress({ fraction, text: progressText(t, fraction) }));
-      setLlm({ ...result, mode });
+      const { runCpuTest, runLlmTest } = await import('./llm');
+      const report = (fraction: number) => setLlmProgress({ fraction, text: progressText(t, fraction) });
+      const result =
+        shownMode === 'compat'
+          ? await runCpuTest(report)
+          : await runLlmTest(resolveModelId(modeInfo(mode).modelId, device.shaderF16), report);
+      setLlm({ ...result, mode: shownMode });
     } catch (err) {
       setError(`${t('setup.writing')}: ${err instanceof Error ? err.message : err}`);
     } finally {
@@ -97,11 +105,11 @@ export function SpeedTest() {
 
       <PrivacyStrip />
 
-      <ReadyBanner device={device} llm={llm} recommended={recommended} current={mode} onSwitch={chooseMode} />
+      <ReadyBanner device={device} llm={llm} recommended={recommended} current={shownMode} onSwitch={chooseMode} />
 
       <Card title={t('setup.mode')}>
         <div role="radiogroup" aria-label={t('setup.mode')} class="space-y-2">
-          {AI_MODES.map((m) => {
+          {modes.map((m) => {
             const Icon = MODE_ICONS[m.mode];
             const selected = m.mode === mode;
             return (
@@ -143,7 +151,7 @@ export function SpeedTest() {
           })}
         </div>
         <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
-          <Button onClick={testLlm} disabled={busy || !device?.webgpu}>{t('setup.testMode')}</Button>
+          <Button onClick={testLlm} disabled={busy || !device || !window.isSecureContext}>{t('setup.testMode')}</Button>
           <span class="text-xs text-muted">{chosen ? t('setup.modeSaved') : t('setup.autoPicked')}</span>
         </div>
         <ProgressBar progress={llmProgress} />
@@ -192,6 +200,8 @@ export function SpeedTest() {
           <p class="mt-2 text-xs text-muted">{t('setup.technicalHint')}</p>
           <dl class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Stat label="WebGPU" value={device.webgpu ? 'yes' : 'no'} />
+            <Stat label="Engine" value={shownMode === 'compat' ? 'CPU (WebAssembly)' : 'GPU (WebGPU)'} />
+            <Stat label="CPU threads" value={crossOriginIsolated ? 'multi' : 'single'} />
             <Stat label="GPU" value={device.gpu ?? '-'} />
             <Stat label="shader-f16" value={device.shaderF16 ? 'yes' : 'no'} />
             <Stat label="CPU cores" value={String(device.cores ?? '?')} />
@@ -256,11 +266,14 @@ function ReadyBanner({
   let title: Key = 'setup.checking';
   let hint: Key | null = null;
 
-  if (device && !device.webgpu) {
-    [tone, title, hint] = ['bad', 'setup.notSupported', 'setup.notSupportedHint'];
+  const usableGpu = !!device?.webgpu && !isSoftwareGpu(device);
+  if (device && !window.isSecureContext) {
+    [tone, title, hint] = ['bad', 'land.start.insecure', 'setup.notSupportedHint'];
   } else if (device && llm) {
     const v = llmVerdict(llm.tokensPerSecond);
     [tone, title] = v === 'good' ? ['good', 'setup.ready'] : v === 'ok' ? ['warn', 'setup.okSlow'] : ['bad', 'setup.slow'];
+  } else if (device && !usableGpu) {
+    [tone, title, hint] = ['info', 'setup.compatTitle', 'land.start.noGpu'];
   } else if (device) {
     [tone, title, hint] = ['info', 'setup.runTestTitle', 'setup.runTest'];
   }
@@ -283,7 +296,7 @@ function ReadyBanner({
         <div class="min-w-0 flex-1">
           <p class="text-base font-semibold tracking-tight">{t(title)}</p>
           {hint && <p class="mt-0.5 text-sm text-muted">{t(hint)}</p>}
-          {device?.webgpu && recommended && recommended !== current && (
+          {usableGpu && recommended && recommended !== current && (
             !llm && heavierThanFit ? (
               <p class="mt-2 text-sm text-muted">{t('setup.testFirst')}</p>
             ) : (
@@ -300,7 +313,7 @@ function ReadyBanner({
       </div>
       {device && (
         <ul class="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 text-sm text-muted">
-          <Fact ok={device.webgpu && !isSoftwareGpu(device)} icon={Monitor}>{t('setup.graphics')}</Fact>
+          <Fact ok={usableGpu} icon={Monitor}>{t('setup.graphics')}</Fact>
           {device.memoryGB != null && <Fact ok={device.memoryGB >= 8} icon={MemoryStick}>{t('setup.memory', { gb: device.memoryGB })}</Fact>}
           {device.storageFreeGB != null && <Fact ok={device.storageFreeGB >= 3} icon={HardDrive}>{t('setup.space', { gb: device.storageFreeGB })}</Fact>}
         </ul>
