@@ -2,17 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { GpuLostError, ai, useAiStatus, type AiStatus, type Message } from '../ai/engine';
 import { Button } from '../ui';
-import { useI18n, type Lang } from '../i18n';
+import { useI18n, type Key, type Lang } from '../i18n';
 import {
   Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
-  Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
+  Info, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
 import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, rewriteMessages, type RewriteId } from './prompts';
 
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
 import { countChanges, diffWords, type DiffPart } from './diff';
-import { modeInfo } from '../speedtest/models';
+import { modeInfo, type AiMode } from '../speedtest/models';
 import type { Editor } from '@tiptap/core';
 import { FormatBar, RichEditor, selectText } from './RichEditor';
 import { markdownToHtml, markdownToPlain } from './format';
@@ -42,6 +42,9 @@ export function ReviewEmail() {
   const [history, setHistory] = useState<string[]>([]);
   const [task, setTask] = useState<Task | null>(null);
   const [error, setError] = useState<{ text: string; gpuLost?: boolean } | null>(null);
+  // Set when Confi switched to a lighter AI mode on its own after a graphics reset.
+  const [switchedTo, setSwitchedTo] = useState<AiMode | null>(null);
+  useEffect(() => ai.onFallback(setSwitchedTo), []);
   // The last AI request, so "Try again" can repeat it.
   const lastRun = useRef<{ next: Task; messages: Message[]; maxTokens: number } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -194,6 +197,15 @@ export function ReviewEmail() {
       </div>
 
       {sensitive.length > 0 && <SensitiveBar matches={sensitive} onSelect={showMatch} />}
+      {switchedTo && (
+        <div class="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand-soft/50 px-4 py-2.5 text-sm" role="status">
+          <Info size={16} class="shrink-0 text-brand" aria-hidden="true" />
+          <span class="flex-1">{t('ai.switched', { mode: t(`mode.${switchedTo}` as Key) })}</span>
+          <button type="button" class="rounded-md p-1 text-muted hover:bg-white hover:text-ink" onClick={() => setSwitchedTo(null)} aria-label={t('check.close')}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
       {error?.gpuLost ? (
         <GpuLostNotice
           onCompat={() => {

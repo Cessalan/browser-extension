@@ -260,20 +260,46 @@ class LocalAI {
   }
 
   /** Streams a reply. `onText` receives the full text so far. */
+  /**
+   * Streams a reply. `onText` receives the full text so far.
+   * If the graphics chip is reset mid-task, steps down to a lighter mode (Faster, then the processor)
+   * and retries the same request, so the person gets their answer instead of an error.
+   */
   async generate(messages: Message[], onText: (text: string) => void, maxTokens = 1024): Promise<string> {
-    const backend = await this.load();
-    try {
-      return await backend.generate(messages, onText, maxTokens);
-    } catch (err) {
-      if (backend.kind !== 'gpu' || !isGpuLost(err)) throw err;
-      // The model on the GPU is gone. Forget it (its files are still cached, so it can reload), and remember
-      // the reset so this computer is steered to a lighter mode.
-      this.engine = null;
-      this.modelIds = null;
-      noteGpuReset();
-      this.set({ state: 'idle', cached: true });
-      throw new GpuLostError(err);
+    for (;;) {
+      const backend = await this.load();
+      try {
+        return await backend.generate(messages, onText, maxTokens);
+      } catch (err) {
+        if (backend.kind !== 'gpu' || !isGpuLost(err)) throw err;
+        // The model on the GPU is gone (its files are still cached). Remember the reset on this computer.
+        this.engine = null;
+        this.modelIds = null;
+        noteGpuReset();
+        const lighter: AiMode = this.mode === 'standard' || this.mode === 'smart' ? 'fast' : 'compat';
+        if (this.mode === lighter) throw new GpuLostError(err);
+        this.switchAfterReset(lighter);
+        onText('');
+      }
     }
+  }
+
+  /** Steps down to a lighter mode after a graphics reset, keeps it for next time, and tells the UI. */
+  private switchAfterReset(mode: AiMode) {
+    this.mode = mode;
+    this.modeResolved = Promise.resolve(mode);
+    this.chosen = true;
+    saveMode(mode);
+    this.set({ state: 'idle', cached: null });
+    this.fallbackListeners.forEach((fn) => fn(mode));
+  }
+
+  private fallbackListeners = new Set<(mode: AiMode) => void>();
+
+  /** Called when Confi switched to a lighter mode on its own (after a graphics reset). */
+  onFallback(fn: (mode: AiMode) => void) {
+    this.fallbackListeners.add(fn);
+    return () => void this.fallbackListeners.delete(fn);
   }
 
   async stop() {
@@ -294,6 +320,35 @@ export function useAiStatus(): AiStatus {
 }
 
 /** Dev only (`npm run dev`, then open `/?mockai`): fake AI for working on the UI without downloading a model. */
+let resetSimulated = false;
+
+async function mockGenerate(messages: Message[], onText: (text: string) => void): Promise<string> {
+  // `/?mockai=gpulost`: the first request fails like a graphics-chip reset, to check the automatic recovery.
+  if (new URLSearchParams(location.search).get('mockai') === 'gpulost' && !resetSimulated) {
+    resetSimulated = true;
+    await new Promise((r) => setTimeout(r, 800));
+    throw new Error("Failed to execute 'mapAsync' on 'GPUBuffer': A valid external Instance reference no longer exists.");
+  }
+  const system = String(messages[0].content);
+  const user = String(messages.at(-1)?.content ?? '');
+  const draft = user.includes('\n\nEmail:\n') ? user.split('\n\nEmail:\n')[1] : user;
+  const reply = system.includes('List up to')
+    ? system.includes('in French')
+      ? '- La date du congé n’est pas précisée.\n- Indiquez qui organise le transport.\n- « eval en physio » peut être flou pour la famille.'
+      : '- The date for the discharge is not stated.\n- Say who will arrange transport.\n- "pending the final PT eval" may be unclear to the family.'
+    : /[àâéèêçù]/.test(draft)
+      ? draft.replace(/\bpt\b/gi, 'patient').replace(/\bpret\b/, 'prêt').replace(/rappelerait/, 'rappellerait').replace(/^merci$/m, 'Merci,')
+      : draft.replace(/\bpt\b/gi, 'the patient').replace(/\bu\b/g, 'you').replace(/\br\b/g, 'are').replace(/thx|thanks/i, 'Thank you,');
+  await new Promise((r) => setTimeout(r, 1500)); // simulate the model thinking before the first word
+  let text = '';
+  for (const word of reply.split(/(?<=\s)/)) {
+    text += word;
+    onText(text);
+    await new Promise((r) => setTimeout(r, 15));
+  }
+  return text;
+}
+
 class MockAI extends LocalAI {
   async checkCached() {
     this.set({ state: 'ready' });
@@ -301,36 +356,7 @@ class MockAI extends LocalAI {
 
   load() {
     this.set({ state: 'ready' });
-    return Promise.resolve(null as unknown as Backend);
-  }
-
-  private resetSimulated = false;
-
-  async generate(messages: Message[], onText: (text: string) => void) {
-    // `/?mockai=gpulost`: the first request fails like a graphics-chip reset, to check the recovery UI.
-    if (new URLSearchParams(location.search).get('mockai') === 'gpulost' && !this.resetSimulated) {
-      this.resetSimulated = true;
-      await new Promise((r) => setTimeout(r, 800));
-      throw new GpuLostError(new Error("Failed to execute 'mapAsync' on 'GPUBuffer'"));
-    }
-    const system = String(messages[0].content);
-    const user = String(messages.at(-1)?.content ?? '');
-    const draft = user.includes('\n\nEmail:\n') ? user.split('\n\nEmail:\n')[1] : user;
-    const reply = system.includes('List up to')
-      ? system.includes('in French')
-        ? '- La date du congé n’est pas précisée.\n- Indiquez qui organise le transport.\n- « eval en physio » peut être flou pour la famille.'
-        : '- The date for the discharge is not stated.\n- Say who will arrange transport.\n- "pending the final PT eval" may be unclear to the family.'
-      : /[àâéèêçù]/.test(draft)
-        ? draft.replace(/\bpt\b/gi, 'patient').replace(/\bpret\b/, 'prêt').replace(/rappelerait/, 'rappellerait').replace(/^merci$/m, 'Merci,')
-        : draft.replace(/\bpt\b/gi, 'the patient').replace(/\bu\b/g, 'you').replace(/\br\b/g, 'are').replace(/thx|thanks/i, 'Thank you,');
-    await new Promise((r) => setTimeout(r, 1500)); // simulate the model thinking before the first word
-    let text = '';
-    for (const word of reply.split(/(?<=\s)/)) {
-      text += word;
-      onText(text);
-      await new Promise((r) => setTimeout(r, 15));
-    }
-    return text;
+    return Promise.resolve<Backend>({ kind: 'gpu', generate: mockGenerate, stop() {}, unload: async () => {} });
   }
 }
 

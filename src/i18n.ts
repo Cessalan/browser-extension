@@ -23,6 +23,7 @@ const en = {
   'ai.gpuLost.text': 'The AI overloaded it, which is common on laptops. Your text is safe. Compatible mode uses the processor instead: a little slower, but steadier.',
   'ai.gpuLost.compat': 'Use Compatible mode (~{mb} MB, once)',
   'ai.gpuLost.retry': 'Try again',
+  'ai.switched': 'Your graphics chip was overloaded, so Confi switched to “{mode}” mode and finished your request. It will stay in this mode on this computer.',
 
   // Review: toolbar
   'review.check': 'Check my text',
@@ -252,6 +253,7 @@ const fr: Record<Key, string> = {
   'ai.gpuLost.text': 'L’IA l’a surchargée, ce qui est courant sur les portables. Votre texte est intact. Le mode Compatible utilise plutôt le processeur : un peu plus lent, mais plus stable.',
   'ai.gpuLost.compat': 'Utiliser le mode Compatible (~{mb} Mo, une fois)',
   'ai.gpuLost.retry': 'Réessayer',
+  'ai.switched': 'Votre puce graphique était surchargée : Confi est passé au mode « {mode} » et a terminé votre demande. Il restera dans ce mode sur cet ordinateur.',
 
   'review.check': 'Vérifier mon texte',
   'review.rewrite': 'Réécrire',
