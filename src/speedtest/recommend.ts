@@ -10,9 +10,12 @@ const step = (mode: AiMode, by: number) => ORDER[Math.min(ORDER.length - 1, Math
  * Picks the AI mode for this computer. First from its specs (instant), then, once a
  * speed test has run, from how fast it actually was, since specs alone can mislead.
  */
-export function recommendMode(device: DeviceInfo, measured?: { mode: AiMode; tokensPerSecond: number }): AiMode {
+export function recommendMode(device: DeviceInfo, measured?: { mode: AiMode; tokensPerSecond: number }, gpuResets = 0): AiMode {
   // No usable graphics (none, software-only, or the page can't use it): the CPU mode is the only one that runs.
   if (!device.webgpu || isSoftwareGpu(device)) return 'compat';
+  // The graphics chip was reset under AI load on this computer: go lighter, then off the GPU entirely.
+  if (gpuResets >= 2) return 'compat';
+  if (gpuResets === 1) return 'fast';
 
   if (measured && measured.mode !== 'compat') {
     const tps = measured.tokensPerSecond;

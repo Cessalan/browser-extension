@@ -1,7 +1,8 @@
 import type { ChatCompletionMessageParam, WebWorkerMLCEngine } from '@mlc-ai/web-llm';
 import { useEffect, useState } from 'preact/hooks';
 import {
-  CPU_MODE, DEFAULT_MODE, chatOptions, extraBody, fallbackModelId, loadSavedMode, modeInfo, resolveModelId, saveMode, type AiMode,
+  CPU_MODE, DEFAULT_MODE, chatOptions, extraBody, fallbackModelId, gpuResetCount, loadSavedMode, modeInfo, noteGpuReset,
+  resolveModelId, saveMode, type AiMode,
 } from '../speedtest/models';
 import { getDeviceInfo } from '../speedtest/device';
 import { recommendMode } from '../speedtest/recommend';
@@ -16,6 +17,23 @@ export type AiStatus =
 export type Message = ChatCompletionMessageParam;
 
 type Progress = (fraction: number, text: string) => void;
+
+/**
+ * The graphics chip was reset mid-task. Windows does this when the GPU is busy for ~2 s (common with
+ * integrated graphics on laptops), and the browser loses the AI model that was on it.
+ */
+export class GpuLostError extends Error {
+  constructor(cause: unknown) {
+    super('The graphics chip was reset', { cause });
+    this.name = 'GpuLostError';
+  }
+}
+
+const GPU_LOST = /mapAsync|Instance reference no longer exists|device (is |was )?lost|lost.*device|DXGI_ERROR|context lost/i;
+
+function isGpuLost(err: unknown) {
+  return GPU_LOST.test(err instanceof Error ? `${err.name} ${err.message}` : String(err));
+}
 
 /** What the app needs from a running model, whichever hardware it runs on. */
 interface Backend {
@@ -175,7 +193,7 @@ class LocalAI {
     this.modeResolved ??= this.chosen
       ? Promise.resolve(this.mode)
       : getDeviceInfo()
-          .then((device) => (this.mode = recommendMode(device)))
+          .then((device) => (this.mode = recommendMode(device, undefined, gpuResetCount())))
           .catch(() => this.mode);
     return this.modeResolved;
   }
@@ -244,7 +262,18 @@ class LocalAI {
   /** Streams a reply. `onText` receives the full text so far. */
   async generate(messages: Message[], onText: (text: string) => void, maxTokens = 1024): Promise<string> {
     const backend = await this.load();
-    return backend.generate(messages, onText, maxTokens);
+    try {
+      return await backend.generate(messages, onText, maxTokens);
+    } catch (err) {
+      if (backend.kind !== 'gpu' || !isGpuLost(err)) throw err;
+      // The model on the GPU is gone. Forget it (its files are still cached, so it can reload), and remember
+      // the reset so this computer is steered to a lighter mode.
+      this.engine = null;
+      this.modelIds = null;
+      noteGpuReset();
+      this.set({ state: 'idle', cached: true });
+      throw new GpuLostError(err);
+    }
   }
 
   async stop() {
@@ -275,7 +304,15 @@ class MockAI extends LocalAI {
     return Promise.resolve(null as unknown as Backend);
   }
 
+  private resetSimulated = false;
+
   async generate(messages: Message[], onText: (text: string) => void) {
+    // `/?mockai=gpulost`: the first request fails like a graphics-chip reset, to check the recovery UI.
+    if (new URLSearchParams(location.search).get('mockai') === 'gpulost' && !this.resetSimulated) {
+      this.resetSimulated = true;
+      await new Promise((r) => setTimeout(r, 800));
+      throw new GpuLostError(new Error("Failed to execute 'mapAsync' on 'GPUBuffer'"));
+    }
     const system = String(messages[0].content);
     const user = String(messages.at(-1)?.content ?? '');
     const draft = user.includes('\n\nEmail:\n') ? user.split('\n\nEmail:\n')[1] : user;

@@ -47,3 +47,11 @@ describe('recommendMode after a speed test', () => {
     expect(recommendMode(strong, { mode: 'smart', tokensPerSecond: 55 })).toBe('smart');
   });
 });
+
+describe('recommendMode after graphics resets', () => {
+  it('goes lighter, then to the processor', () => {
+    expect(recommendMode(strong, undefined, 1)).toBe('fast');
+    expect(recommendMode(strong, undefined, 2)).toBe('compat');
+    expect(recommendMode(strong, { mode: 'standard', tokensPerSecond: 55 }, 2)).toBe('compat');
+  });
+});

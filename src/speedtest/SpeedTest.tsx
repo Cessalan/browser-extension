@@ -10,7 +10,7 @@ import { ai } from '../ai/engine';
 import { getDeviceInfo, type DeviceInfo } from './device';
 import type { LlmResult } from './llm';
 import type { SttResult } from './stt';
-import { CPU_MODE, GPU_MODES, modeInfo, resolveModelId, type AiMode } from './models';
+import { CPU_MODE, GPU_MODES, modeInfo, resolveModelId, type AiMode, gpuResetCount } from './models';
 import { formatReport, llmVerdict, sttVerdict, type Verdict } from './report';
 import { MODE_ORDER, isSoftwareGpu, recommendMode } from './recommend';
 
@@ -39,7 +39,7 @@ export function SpeedTest() {
   }, []);
 
   // What suits this computer: from its specs, refined by the speed test once it has run.
-  const recommended = device ? recommendMode(device, llm && { mode: llm.mode, tokensPerSecond: llm.tokensPerSecond }) : null;
+  const recommended = device ? recommendMode(device, llm && { mode: llm.mode, tokensPerSecond: llm.tokensPerSecond }, gpuResetCount()) : null;
 
   const busy = llmProgress !== null || sttProgress !== null;
 

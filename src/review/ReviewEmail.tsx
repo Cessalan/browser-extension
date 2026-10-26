@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { ai, useAiStatus, type AiStatus, type Message } from '../ai/engine';
+import { GpuLostError, ai, useAiStatus, type AiStatus, type Message } from '../ai/engine';
 import { Button } from '../ui';
 import { useI18n, type Lang } from '../i18n';
 import {
   Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
-  Scissors, Sparkles, SpellCheck, Square, Undo2, X, type LucideIcon,
+  Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
 import { REWRITES, cleanRewrite, customMessages, parseBullets, reviewMessages, rewriteMessages, type RewriteId } from './prompts';
@@ -41,7 +41,9 @@ export function ReviewEmail() {
   const [draft, setDraft] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [task, setTask] = useState<Task | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ text: string; gpuLost?: boolean } | null>(null);
+  // The last AI request, so "Try again" can repeat it.
+  const lastRun = useRef<{ next: Task; messages: Message[]; maxTokens: number } | null>(null);
   const [copied, setCopied] = useState(false);
   const [instruction, setInstruction] = useState('');
   const status = useAiStatus();
@@ -110,13 +112,14 @@ export function ReviewEmail() {
 
   async function run(next: Task, messages: Message[], maxTokens: number) {
     setError(null);
+    lastRun.current = { next, messages, maxTokens };
     setTask(next);
     try {
       const text = await ai.generate(messages, (t) => setTask((cur) => cur && { ...cur, text: t }), maxTokens);
       setTask((cur) => cur && { ...cur, text: cur.kind === 'rewrite' ? cleanRewrite(text) : text, done: true });
     } catch (err) {
       setTask(null);
-      setError(err instanceof Error ? err.message : String(err));
+      setError(err instanceof GpuLostError ? { text: '', gpuLost: true } : { text: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -191,7 +194,21 @@ export function ReviewEmail() {
       </div>
 
       {sensitive.length > 0 && <SensitiveBar matches={sensitive} onSelect={showMatch} />}
-      {error && <p class="rounded-md bg-red-50 p-3 text-sm text-bad">{error}</p>}
+      {error?.gpuLost ? (
+        <GpuLostNotice
+          onCompat={() => {
+            setError(null);
+            void ai.setMode('compat');
+          }}
+          onRetry={() => {
+            const last = lastRun.current;
+            setError(null);
+            if (last) void run({ ...last.next, text: '', done: false, startedAt: Date.now() }, last.messages, last.maxTokens);
+          }}
+        />
+      ) : (
+        error && <p class="rounded-md bg-red-50 p-3 text-sm text-bad">{error.text}</p>
+      )}
 
       {task?.kind === 'rewrite' ? (
         <Compare
@@ -545,6 +562,24 @@ function InstructionBox({
       </button>
       {trailing && <div class="flex shrink-0 items-center">{trailing}</div>}
     </form>
+  );
+}
+
+/** Shown when the graphics chip was reset mid-task: explains it calmly and offers a steadier mode. */
+function GpuLostNotice({ onCompat, onRetry }: { onCompat: () => void; onRetry: () => void }) {
+  const { t } = useI18n();
+  return (
+    <section class="flex gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+      <TriangleAlert size={20} class="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
+      <div class="min-w-0 flex-1">
+        <p class="font-semibold text-ink">{t('ai.gpuLost.title')}</p>
+        <p class="mt-1 text-ink/80">{t('ai.gpuLost.text')}</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <Button onClick={onCompat}>{t('ai.gpuLost.compat', { mb: modeInfo('compat').downloadMB })}</Button>
+          <Button variant="secondary" onClick={onRetry}>{t('ai.gpuLost.retry')}</Button>
+        </div>
+      </div>
+    </section>
   );
 }
 
