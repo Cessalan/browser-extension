@@ -7,7 +7,8 @@ import pkg from './package.json' with { type: 'json' };
 // Shown in the footer so we can tell which version someone is running.
 const version = `${pkg.version}${process.env.GITHUB_SHA ? `+${process.env.GITHUB_SHA.slice(0, 7)}` : '-dev'}`;
 
-// BASE_PATH is set by the GitHub Pages workflow (e.g. "/browser-extension/").
+// The site is served from the root of its custom domain. Set BASE_PATH only to host it under a sub-path
+// (e.g. "/browser-extension/" on cessalan.github.io without a custom domain).
 export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
   define: { __APP_VERSION__: JSON.stringify(version) },
@@ -33,7 +34,7 @@ export default defineConfig({
       workbox: {
         // Precache the small app shell. The AI engines (large) are cached the first time they're used.
         // Model weights are cached separately by the AI libraries themselves.
-        globPatterns: ['**/*.{css,html,svg}', 'assets/index-*.js'],
+        globPatterns: ['**/*.{css,html,svg,ico}', 'favicon-32.png', 'assets/index-*.js'],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.origin === self.location.origin && /\/assets\/.+\.(js|wasm|mjs)$/.test(url.pathname),

@@ -16,11 +16,13 @@ npm test         # unit tests
 npm run build    # production build in dist/
 ```
 
-## Put it online (GitHub Pages)
+## Live site
 
-1. Repo **Settings → Pages → Source: GitHub Actions**
-2. Merge to `main` (or run the "Deploy to GitHub Pages" workflow by hand)
-3. Open `https://<user>.github.io/<repo>/`
+**https://confi.ca** (GitHub Pages, custom domain).
+
+- Deploys automatically on every merge to `main` (`.github/workflows/deploy.yml`).
+- Domain: set in **Settings → Pages → Custom domain**. DNS: A records `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`; `www` CNAME → `cessalan.github.io`.
+- The app is built for the domain root (`/`). Set `BASE_PATH` only to host it under a sub-path.
 
 ## Stack
 
