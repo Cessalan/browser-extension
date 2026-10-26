@@ -7,6 +7,7 @@ import {
 import { getDeviceInfo } from '../speedtest/device';
 import { recommendMode } from '../speedtest/recommend';
 import type { CpuMessage, CpuRequest } from './cpu.worker';
+import { cutRepetition } from './quality';
 
 export type AiStatus =
   | { state: 'idle'; cached: boolean | null }
@@ -79,6 +80,8 @@ async function startGpu(primary: string, fallback: string, onProgress: Progress)
         stream: true,
         max_tokens: maxTokens,
         temperature: 0.3,
+        // Small models can fall into loops; this nudges them away from repeating themselves.
+        repetition_penalty: 1.1,
         extra_body: extraBody(modelId),
       });
       let text = '';
@@ -268,8 +271,22 @@ class LocalAI {
   async generate(messages: Message[], onText: (text: string) => void, maxTokens = 1024): Promise<string> {
     for (;;) {
       const backend = await this.load();
+      // Loop guard: if the reply starts repeating itself, stop the model and keep the part before the loop.
+      let cut: string | null = null;
+      const guarded = (text: string) => {
+        if (cut !== null) return;
+        const checked = cutRepetition(text);
+        if (checked.looped) {
+          cut = checked.text;
+          onText(cut);
+          backend.stop();
+        } else {
+          onText(text);
+        }
+      };
       try {
-        return await backend.generate(messages, onText, maxTokens);
+        const text = await backend.generate(messages, guarded, maxTokens);
+        return cut ?? cutRepetition(text).text;
       } catch (err) {
         if (backend.kind !== 'gpu' || !isGpuLost(err)) throw err;
         // The model on the GPU is gone (its files are still cached). Remember the reset on this computer.
@@ -329,9 +346,21 @@ async function mockGenerate(messages: Message[], onText: (text: string) => void)
     await new Promise((r) => setTimeout(r, 800));
     throw new Error("Failed to execute 'mapAsync' on 'GPUBuffer': A valid external Instance reference no longer exists.");
   }
+  // `/?mockai=loop` and `/?mockai=offtopic`: misbehave like a small model, to check the guards.
+  const misbehave = new URLSearchParams(location.search).get('mockai');
+  if (misbehave === 'loop' || misbehave === 'offtopic') {
+    const reply = misbehave === 'loop' ? 'The team is working on a project.\n'.repeat(40) : 'The team is working on a project. We will meet next week to review it.';
+    let text = '';
+    for (const word of reply.split(/(?<=\s)/)) {
+      text += word;
+      onText(text);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    return text;
+  }
   const system = String(messages[0].content);
   const user = String(messages.at(-1)?.content ?? '');
-  const draft = user.includes('\n\nEmail:\n') ? user.split('\n\nEmail:\n')[1] : user;
+  const draft = /<text>\n([\s\S]*)\n<\/text>/.exec(user)?.[1] ?? user;
   const reply = system.includes('List up to')
     ? system.includes('in French')
       ? '- La date du congé n’est pas précisée.\n- Indiquez qui organise le transport.\n- « eval en physio » peut être flou pour la famille.'

@@ -59,7 +59,8 @@ async function generate(messages: { role: string; content: string }[], maxTokens
       post({ type: 'text', text });
     },
   });
-  await generator(messages, { max_new_tokens: maxTokens, do_sample: false, streamer, stopping_criteria: stopping });
+  // repetition_penalty: small models can fall into loops; this nudges them away from repeating themselves.
+  await generator(messages, { max_new_tokens: maxTokens, do_sample: false, repetition_penalty: 1.15, streamer, stopping_criteria: stopping });
   post({ type: 'done', text });
 }
 

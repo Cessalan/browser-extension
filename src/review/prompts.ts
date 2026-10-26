@@ -3,7 +3,7 @@ import type { Key, Lang } from '../i18n';
 
 const BASE = 'You help a professional edit a text (an email, a note or a report) that may contain confidential details.';
 const KEEP_FACTS =
-  'Keep every name, date, time, number and fact exactly as written. Do not invent information. Reply with only the edited text, no introduction or notes.';
+  'Keep every name, date, time, number and fact exactly as written. Do not invent information. Reply with only the edited text, no introduction, notes or <text> tags.';
 // Emails carry formatting as Markdown; small models keep it when told explicitly.
 const KEEP_FORMAT =
   'The text uses Markdown formatting (**bold**, *italic*, <u>underline</u>, ==highlight==, "- " bullet lists, "1." numbered lists). Keep this formatting where it still fits and reply in the same Markdown.';
@@ -19,11 +19,19 @@ export const REWRITES = [
 
 export type RewriteId = (typeof REWRITES)[number]['id'];
 
+/**
+ * Marks the person's text clearly. Small models otherwise sometimes treat the text itself as the request
+ * and write something unrelated.
+ */
+function wrap(text: string) {
+  return `<text>\n${text}\n</text>`;
+}
+
 export function rewriteMessages(id: RewriteId, draft: string): Message[] {
   const { instruction } = REWRITES.find((r) => r.id === id)!;
   return [
     { role: 'system', content: `${BASE} ${instruction} ${KEEP_FACTS} ${KEEP_FORMAT} ${SAME_LANGUAGE}` },
-    { role: 'user', content: draft },
+    { role: 'user', content: `${instruction}\n\n${wrap(draft)}` },
   ];
 }
 
@@ -31,7 +39,7 @@ export function rewriteMessages(id: RewriteId, draft: string): Message[] {
 export function customMessages(instruction: string, draft: string): Message[] {
   return [
     { role: 'system', content: `${BASE} Apply the person's instruction to the text. ${KEEP_FACTS} ${KEEP_FORMAT} ${SAME_LANGUAGE}` },
-    { role: 'user', content: `Instruction: ${instruction.trim()}\n\nEmail:\n${draft}` },
+    { role: 'user', content: `Instruction: ${instruction.trim()}\n\n${wrap(draft)}` },
   ];
 }
 
@@ -42,7 +50,7 @@ export function reviewMessages(draft: string, lang: Lang): Message[] {
       role: 'system',
       content: `You help a professional check a text (an email, a note or a report) before it is sent or filed. The text may be in English or French. List up to 4 specific problems: unclear sentences, missing information the reader needs (dates, times, who does what, next steps), tone, or typos. One short line each, starting with "- ". If the text is fine, reply "- ${lang === 'fr' ? 'Tout est correct.' : 'Looks good.'}" Do not rewrite the text. ${answerIn}`,
     },
-    { role: 'user', content: draft },
+    { role: 'user', content: `Check this text:\n\n${wrap(draft)}` },
   ];
 }
 
@@ -58,6 +66,7 @@ export function parseBullets(text: string): string[] {
 export function cleanRewrite(text: string): string {
   return text
     .replace(/^```\w*\n?|\n?```$/g, '')
+    .replace(/<\/?text>/g, '')
     .replace(/^\s*(?:here(?:'s| is)|sure|certainly|voici|bien sûr|certainement)[^\n]*:\s*\n+/i, '')
     .trim();
 }
