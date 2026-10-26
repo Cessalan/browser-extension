@@ -25,9 +25,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      # Served from the root of the custom domain (set in Settings → Pages).
       - run: npm run build
-        env:
-          BASE_PATH: /${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

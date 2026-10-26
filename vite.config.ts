@@ -7,7 +7,8 @@ import pkg from './package.json' with { type: 'json' };
 // Shown in the footer so we can tell which version someone is running.
 const version = `${pkg.version}${process.env.GITHUB_SHA ? `+${process.env.GITHUB_SHA.slice(0, 7)}` : '-dev'}`;
 
-// BASE_PATH is set by the GitHub Pages workflow (e.g. "/browser-extension/").
+// The site is served from the root of its custom domain. Set BASE_PATH only to host it under a sub-path
+// (e.g. "/browser-extension/" on cessalan.github.io without a custom domain).
 export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
   define: { __APP_VERSION__: JSON.stringify(version) },
