@@ -16,6 +16,7 @@ import { modeInfo, type AiMode } from '../speedtest/models';
 import type { Editor } from '@tiptap/core';
 import { FormatBar, RichEditor, selectText } from './RichEditor';
 import { markdownToHtml, markdownToPlain } from './format';
+import { looksUnrelated } from '../ai/quality';
 
 // Made-up examples. Never use real patient data here.
 const EXAMPLE_FR = `Bonjour Dre Tremblay,
@@ -33,7 +34,8 @@ thx
 Jordan` };
 
 type Review = { kind: 'review'; text: string; done: boolean; forDraft: string; startedAt: number };
-type Rewrite = { kind: 'rewrite'; label: string; original: string; text: string; done: boolean; startedAt: number };
+// `checkRelevance`: built-in rewrites keep the text's language, so a reply sharing almost no words with it is discarded.
+type Rewrite = { kind: 'rewrite'; label: string; original: string; text: string; done: boolean; startedAt: number; checkRelevance?: boolean };
 type Task = Review | Rewrite;
 
 export function ReviewEmail() {
@@ -41,7 +43,7 @@ export function ReviewEmail() {
   const [draft, setDraft] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [task, setTask] = useState<Task | null>(null);
-  const [error, setError] = useState<{ text: string; gpuLost?: boolean } | null>(null);
+  const [error, setError] = useState<{ text: string; gpuLost?: boolean; unreliable?: boolean } | null>(null);
   // Set when Confi switched to a lighter AI mode on its own after a graphics reset.
   const [switchedTo, setSwitchedTo] = useState<AiMode | null>(null);
   useEffect(() => ai.onFallback(setSwitchedTo), []);
@@ -119,7 +121,14 @@ export function ReviewEmail() {
     setTask(next);
     try {
       const text = await ai.generate(messages, (t) => setTask((cur) => cur && { ...cur, text: t }), maxTokens);
-      setTask((cur) => cur && { ...cur, text: cur.kind === 'rewrite' ? cleanRewrite(text) : text, done: true });
+      const result = next.kind === 'rewrite' ? cleanRewrite(text) : text;
+      if (next.kind === 'rewrite' && next.checkRelevance && looksUnrelated(markdownToPlain(next.original), markdownToPlain(result))) {
+        // The model ignored the text (it happens with the smallest modes): don't show nonsense.
+        setTask(null);
+        setError({ text: '', unreliable: true });
+        return;
+      }
+      setTask((cur) => cur && { ...cur, text: result, done: true });
     } catch (err) {
       setTask(null);
       setError(err instanceof GpuLostError ? { text: '', gpuLost: true } : { text: err instanceof Error ? err.message : String(err) });
@@ -132,10 +141,10 @@ export function ReviewEmail() {
   }
 
   /** `original` is what the diff compares against; `messages` may target a previous suggestion when refining. */
-  function rewrite(label: string, original: string, messages: Message[]) {
+  function rewrite(label: string, original: string, messages: Message[], checkRelevance = false) {
     // A rewrite is about as long as its input; leave room so it never stops mid-sentence.
     const maxTokens = Math.min(2000, Math.max(300, countWords(String(messages.at(-1)?.content ?? '')) * 2 + 150));
-    void run({ kind: 'rewrite', label, original, text: '', done: false, startedAt: Date.now() }, messages, maxTokens);
+    void run({ kind: 'rewrite', label, original, text: '', done: false, startedAt: Date.now(), checkRelevance }, messages, maxTokens);
   }
 
   // With a suggestion on screen, the instruction box refines that suggestion; otherwise it edits the draft.
@@ -181,7 +190,7 @@ export function ReviewEmail() {
         <span class="mx-1 hidden h-6 w-px bg-line sm:block" />
         <span class="px-1 text-xs font-medium uppercase tracking-wide text-muted">{t('review.rewrite')}</span>
         {REWRITES.map((r) => (
-          <Button key={r.id} variant="secondary" icon={REWRITE_ICONS[r.id]} onClick={() => rewrite(t(r.label), draft, rewriteMessages(r.id, draft))} disabled={!canAct}>
+          <Button key={r.id} variant="secondary" icon={REWRITE_ICONS[r.id]} onClick={() => rewrite(t(r.label), draft, rewriteMessages(r.id, draft), true)} disabled={!canAct}>
             {t(r.label)}
           </Button>
         ))}
@@ -218,6 +227,26 @@ export function ReviewEmail() {
             if (last) void run({ ...last.next, text: '', done: false, startedAt: Date.now() }, last.messages, last.maxTokens);
           }}
         />
+      ) : error?.unreliable ? (
+        <section class="flex gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm" role="status">
+          <Info size={20} class="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
+          <div class="min-w-0 flex-1">
+            <p class="text-ink">{t('ai.unreliable')}</p>
+            <div class="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const last = lastRun.current;
+                  setError(null);
+                  if (last) void run({ ...last.next, text: '', done: false, startedAt: Date.now() }, last.messages, last.maxTokens);
+                }}
+              >
+                {t('ai.gpuLost.retry')}
+              </Button>
+              <a href="#/setup" class="text-sm text-brand underline">{t('ai.unreliableSetup')}</a>
+            </div>
+          </div>
+        </section>
       ) : (
         error && <p class="rounded-md bg-red-50 p-3 text-sm text-bad">{error.text}</p>
       )}

@@ -31,7 +31,7 @@ describe('prompts', () => {
 
   it('includes the user instruction and the email', () => {
     const [, user] = customMessages('  mets la demande en premier ', 'Bonjour Dr Roy');
-    expect(user.content).toBe('Instruction: mets la demande en premier\n\nEmail:\nBonjour Dr Roy');
+    expect(user.content).toBe('Instruction: mets la demande en premier\n\n<text>\nBonjour Dr Roy\n</text>');
   });
 
   it('answers the check in the UI language', () => {
@@ -51,6 +51,7 @@ describe('cleanRewrite', () => {
     expect(cleanRewrite('Here is the rewritten email:\n\nHi Dr. Lee,\nThanks.')).toBe('Hi Dr. Lee,\nThanks.');
     expect(cleanRewrite('Voici le courriel révisé :\n\nBonjour,')).toBe('Bonjour,');
     expect(cleanRewrite('```\nHi team\n```')).toBe('Hi team');
+    expect(cleanRewrite('<text>\nHi team\n</text>')).toBe('Hi team');
   });
 
   it('keeps normal emails untouched', () => {
