@@ -7,7 +7,7 @@ import {
 import { setLang, useI18n, type Key } from '../i18n';
 import { ai, useAiStatus } from '../ai/engine';
 import { getDeviceInfo, type DeviceInfo } from '../speedtest/device';
-import { CPU_MODE, GPU_MODES, modeInfo, type AiMode } from '../speedtest/models';
+import { CPU_MODE, GPU_MODES, modeInfo, type AiMode, gpuResetCount } from '../speedtest/models';
 import { isSoftwareGpu, recommendMode } from '../speedtest/recommend';
 
 const MODE_ICONS: Record<AiMode, LucideIcon> = { compat: Cpu, fast: Zap, standard: Star, smart: Brain };
@@ -258,7 +258,7 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
     void ai.resolveMode().then(setMode);
   }, []);
 
-  const recommended = device ? recommendMode(device) : null;
+  const recommended = device ? recommendMode(device, undefined, gpuResetCount()) : null;
   // Without usable graphics only the processor ("Compatible") mode can run.
   const usableGpu = !!device?.webgpu && !isSoftwareGpu(device);
   const modes = usableGpu ? GPU_MODES : [CPU_MODE];

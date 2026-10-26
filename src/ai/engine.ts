@@ -1,7 +1,8 @@
 import type { ChatCompletionMessageParam, WebWorkerMLCEngine } from '@mlc-ai/web-llm';
 import { useEffect, useState } from 'preact/hooks';
 import {
-  CPU_MODE, DEFAULT_MODE, chatOptions, extraBody, fallbackModelId, loadSavedMode, modeInfo, resolveModelId, saveMode, type AiMode,
+  CPU_MODE, DEFAULT_MODE, chatOptions, extraBody, fallbackModelId, gpuResetCount, loadSavedMode, modeInfo, noteGpuReset,
+  resolveModelId, saveMode, type AiMode,
 } from '../speedtest/models';
 import { getDeviceInfo } from '../speedtest/device';
 import { recommendMode } from '../speedtest/recommend';
@@ -16,6 +17,23 @@ export type AiStatus =
 export type Message = ChatCompletionMessageParam;
 
 type Progress = (fraction: number, text: string) => void;
+
+/**
+ * The graphics chip was reset mid-task. Windows does this when the GPU is busy for ~2 s (common with
+ * integrated graphics on laptops), and the browser loses the AI model that was on it.
+ */
+export class GpuLostError extends Error {
+  constructor(cause: unknown) {
+    super('The graphics chip was reset', { cause });
+    this.name = 'GpuLostError';
+  }
+}
+
+const GPU_LOST = /mapAsync|Instance reference no longer exists|device (is |was )?lost|lost.*device|DXGI_ERROR|context lost/i;
+
+function isGpuLost(err: unknown) {
+  return GPU_LOST.test(err instanceof Error ? `${err.name} ${err.message}` : String(err));
+}
 
 /** What the app needs from a running model, whichever hardware it runs on. */
 interface Backend {
@@ -175,7 +193,7 @@ class LocalAI {
     this.modeResolved ??= this.chosen
       ? Promise.resolve(this.mode)
       : getDeviceInfo()
-          .then((device) => (this.mode = recommendMode(device)))
+          .then((device) => (this.mode = recommendMode(device, undefined, gpuResetCount())))
           .catch(() => this.mode);
     return this.modeResolved;
   }
@@ -242,9 +260,46 @@ class LocalAI {
   }
 
   /** Streams a reply. `onText` receives the full text so far. */
+  /**
+   * Streams a reply. `onText` receives the full text so far.
+   * If the graphics chip is reset mid-task, steps down to a lighter mode (Faster, then the processor)
+   * and retries the same request, so the person gets their answer instead of an error.
+   */
   async generate(messages: Message[], onText: (text: string) => void, maxTokens = 1024): Promise<string> {
-    const backend = await this.load();
-    return backend.generate(messages, onText, maxTokens);
+    for (;;) {
+      const backend = await this.load();
+      try {
+        return await backend.generate(messages, onText, maxTokens);
+      } catch (err) {
+        if (backend.kind !== 'gpu' || !isGpuLost(err)) throw err;
+        // The model on the GPU is gone (its files are still cached). Remember the reset on this computer.
+        this.engine = null;
+        this.modelIds = null;
+        noteGpuReset();
+        const lighter: AiMode = this.mode === 'standard' || this.mode === 'smart' ? 'fast' : 'compat';
+        if (this.mode === lighter) throw new GpuLostError(err);
+        this.switchAfterReset(lighter);
+        onText('');
+      }
+    }
+  }
+
+  /** Steps down to a lighter mode after a graphics reset, keeps it for next time, and tells the UI. */
+  private switchAfterReset(mode: AiMode) {
+    this.mode = mode;
+    this.modeResolved = Promise.resolve(mode);
+    this.chosen = true;
+    saveMode(mode);
+    this.set({ state: 'idle', cached: null });
+    this.fallbackListeners.forEach((fn) => fn(mode));
+  }
+
+  private fallbackListeners = new Set<(mode: AiMode) => void>();
+
+  /** Called when Confi switched to a lighter mode on its own (after a graphics reset). */
+  onFallback(fn: (mode: AiMode) => void) {
+    this.fallbackListeners.add(fn);
+    return () => void this.fallbackListeners.delete(fn);
   }
 
   async stop() {
@@ -265,6 +320,35 @@ export function useAiStatus(): AiStatus {
 }
 
 /** Dev only (`npm run dev`, then open `/?mockai`): fake AI for working on the UI without downloading a model. */
+let resetSimulated = false;
+
+async function mockGenerate(messages: Message[], onText: (text: string) => void): Promise<string> {
+  // `/?mockai=gpulost`: the first request fails like a graphics-chip reset, to check the automatic recovery.
+  if (new URLSearchParams(location.search).get('mockai') === 'gpulost' && !resetSimulated) {
+    resetSimulated = true;
+    await new Promise((r) => setTimeout(r, 800));
+    throw new Error("Failed to execute 'mapAsync' on 'GPUBuffer': A valid external Instance reference no longer exists.");
+  }
+  const system = String(messages[0].content);
+  const user = String(messages.at(-1)?.content ?? '');
+  const draft = user.includes('\n\nEmail:\n') ? user.split('\n\nEmail:\n')[1] : user;
+  const reply = system.includes('List up to')
+    ? system.includes('in French')
+      ? '- La date du congé n’est pas précisée.\n- Indiquez qui organise le transport.\n- « eval en physio » peut être flou pour la famille.'
+      : '- The date for the discharge is not stated.\n- Say who will arrange transport.\n- "pending the final PT eval" may be unclear to the family.'
+    : /[àâéèêçù]/.test(draft)
+      ? draft.replace(/\bpt\b/gi, 'patient').replace(/\bpret\b/, 'prêt').replace(/rappelerait/, 'rappellerait').replace(/^merci$/m, 'Merci,')
+      : draft.replace(/\bpt\b/gi, 'the patient').replace(/\bu\b/g, 'you').replace(/\br\b/g, 'are').replace(/thx|thanks/i, 'Thank you,');
+  await new Promise((r) => setTimeout(r, 1500)); // simulate the model thinking before the first word
+  let text = '';
+  for (const word of reply.split(/(?<=\s)/)) {
+    text += word;
+    onText(text);
+    await new Promise((r) => setTimeout(r, 15));
+  }
+  return text;
+}
+
 class MockAI extends LocalAI {
   async checkCached() {
     this.set({ state: 'ready' });
@@ -272,28 +356,7 @@ class MockAI extends LocalAI {
 
   load() {
     this.set({ state: 'ready' });
-    return Promise.resolve(null as unknown as Backend);
-  }
-
-  async generate(messages: Message[], onText: (text: string) => void) {
-    const system = String(messages[0].content);
-    const user = String(messages.at(-1)?.content ?? '');
-    const draft = user.includes('\n\nEmail:\n') ? user.split('\n\nEmail:\n')[1] : user;
-    const reply = system.includes('List up to')
-      ? system.includes('in French')
-        ? '- La date du congé n’est pas précisée.\n- Indiquez qui organise le transport.\n- « eval en physio » peut être flou pour la famille.'
-        : '- The date for the discharge is not stated.\n- Say who will arrange transport.\n- "pending the final PT eval" may be unclear to the family.'
-      : /[àâéèêçù]/.test(draft)
-        ? draft.replace(/\bpt\b/gi, 'patient').replace(/\bpret\b/, 'prêt').replace(/rappelerait/, 'rappellerait').replace(/^merci$/m, 'Merci,')
-        : draft.replace(/\bpt\b/gi, 'the patient').replace(/\bu\b/g, 'you').replace(/\br\b/g, 'are').replace(/thx|thanks/i, 'Thank you,');
-    await new Promise((r) => setTimeout(r, 1500)); // simulate the model thinking before the first word
-    let text = '';
-    for (const word of reply.split(/(?<=\s)/)) {
-      text += word;
-      onText(text);
-      await new Promise((r) => setTimeout(r, 15));
-    }
-    return text;
+    return Promise.resolve<Backend>({ kind: 'gpu', generate: mockGenerate, stop() {}, unload: async () => {} });
   }
 }
 

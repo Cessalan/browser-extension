@@ -35,6 +35,25 @@ export function loadSavedMode(): AiMode | null {
   return null;
 }
 
+const GPU_RESETS_KEY = 'gpuResets';
+
+/** How many times the graphics chip was reset while running the AI on this computer (a count, nothing else). */
+export function gpuResetCount(): number {
+  try {
+    return Number(localStorage.getItem(GPU_RESETS_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function noteGpuReset() {
+  try {
+    localStorage.setItem(GPU_RESETS_KEY, String(gpuResetCount() + 1));
+  } catch {
+    // Not critical: we just won't remember it.
+  }
+}
+
 export function saveMode(mode: AiMode) {
   try {
     localStorage.setItem(MODE_KEY, mode);
