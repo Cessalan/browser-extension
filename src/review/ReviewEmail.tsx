@@ -12,6 +12,9 @@ import { REWRITES, detectTextLang, parseBullets, reviewMessages, type RewriteId 
 import { IssuePopover, isSureFix, useProofread } from './proofread';
 import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
 import { translateText } from '../ai/translate';
+import { Assistant, type ChatEntry } from './Assistant';
+import { chatMessages, splitReply, unlockProposal, type ChatTurn } from './chat';
+import { unlockDetails } from '../ai/mask';
 
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
 import { countChanges, diffWords, type DiffPart } from './diff';
@@ -158,6 +161,74 @@ export function ReviewEmail() {
     );
   }
 
+  // Assistant chat, with Chrome's built-in AI (smart enough to hold a conversation). Never saved.
+  const chatOn = ai.mode === 'chrome';
+  // The mode is picked from this computer's specs after the first render: show the chat once it's known.
+  const [, modeKnown] = useState(false);
+  useEffect(() => void ai.resolveMode().then(() => modeKnown(true)), []);
+  const [chatLog, setChatLog] = useState<ChatEntry[]>([]);
+  const [chatBusy, setChatBusy] = useState<{ say: string; writing: boolean } | null>(null);
+  const chatHistory = useRef<ChatTurn[]>([]);
+  const chatRun = useRef(0);
+
+  /** Sends a request to the assistant. A proposed version opens side by side; the text itself never changes on its own. */
+  async function sendChat(request: string) {
+    const run = ++chatRun.current;
+    // With a suggestion on screen, the request applies to that suggestion (diffed against the original text).
+    const current = task?.kind === 'rewrite' && task.done ? task : null;
+    const base = current?.text ?? draft;
+    const original = current?.original ?? draft;
+    const startedAt = Date.now();
+    setError(null);
+    setChatLog((l) => [...l, { role: 'user', say: request }]);
+    setChatBusy({ say: '', writing: false });
+    const { messages, locked } = chatMessages(chatHistory.current, request, base, detectTextLang(markdownToPlain(base)) );
+    const proposal = (text: string, done: boolean): Task => ({
+      kind: 'rewrite', label: quote(request, lang), original, text, done, startedAt, translated: current?.translated,
+    });
+    try {
+      const words = countWords(markdownToPlain(base));
+      const raw = await ai.generate(
+        messages,
+        (soFar) => {
+          if (run !== chatRun.current) return;
+          const r = splitReply(soFar);
+          setChatBusy({ say: r.say, writing: r.writing });
+          if (r.text) setTask(proposal(unlockDetails(r.text, locked).text, false));
+        },
+        Math.min(2000, words * 3 + 200),
+      );
+      if (run !== chatRun.current) return;
+      const r = splitReply(raw);
+      const text = r.text && unlockProposal(r.text, locked);
+      if (text) setTask(proposal(text, true));
+      else if (r.text) setTask(current); // the AI dropped a protected detail: keep what was there
+      chatHistory.current = [...chatHistory.current, { role: 'user' as const, content: request }, { role: 'assistant' as const, content: r.say || '…' }].slice(-12);
+      setChatLog((l) => [...l, { role: 'assistant', say: r.say, proposal: text ? 'shown' : r.text ? 'setAside' : undefined }]);
+    } catch {
+      if (run === chatRun.current) setChatLog((l) => [...l, { role: 'assistant', say: '', failed: true }]);
+    } finally {
+      if (run === chatRun.current) setChatBusy(null);
+    }
+  }
+
+  function resetChat() {
+    chatRun.current++;
+    chatHistory.current = [];
+    setChatLog([]);
+    setChatBusy(null);
+  }
+
+  /** Closes the suggestion (and stops the assistant if it was still writing it). */
+  function discard() {
+    if (chatBusy) {
+      chatRun.current++;
+      setChatBusy(null);
+      void ai.stop();
+    }
+    setTask(null);
+  }
+
   /** Translates the draft into the other language (French ↔ English). */
   function translate() {
     const to = textLang === 'fr' ? 'en' : 'fr';
@@ -224,17 +295,33 @@ export function ReviewEmail() {
         <Button variant="secondary" icon={Languages} onClick={translate} disabled={!canAct}>
           {t(textLang === 'fr' ? 'translate.toEn' : 'translate.toFr')}
         </Button>
-        <InstructionBox
-          trailing={needsAttention(status) ? <AiPill status={status} /> : undefined}
-          value={instruction}
-          onInput={setInstruction}
-          onSubmit={applyInstruction}
-          placeholder={refining ? t('compare.refine') : t('custom.placeholder')}
-          button={t('custom.apply')}
-          disabled={running || (!refining && !plain.trim())}
-        />
+        {/* With the assistant chat on, instructions go through the chat instead. */}
+        {chatOn ? (
+          needsAttention(status) && <span class="ml-auto"><AiPill status={status} /></span>
+        ) : (
+          <InstructionBox
+            trailing={needsAttention(status) ? <AiPill status={status} /> : undefined}
+            value={instruction}
+            onInput={setInstruction}
+            onSubmit={applyInstruction}
+            placeholder={refining ? t('compare.refine') : t('custom.placeholder')}
+            button={t('custom.apply')}
+            disabled={running || (!refining && !plain.trim())}
+          />
+        )}
       </div>
 
+      <div class={chatOn ? 'grid items-start gap-4 lg:grid-cols-[340px_minmax(0,1fr)]' : ''}>
+      {chatOn && (
+        <Assistant
+          entries={chatLog}
+          busy={chatBusy}
+          disabled={!plain.trim() || running}
+          onSend={(m) => void sendChat(m)}
+          onReset={resetChat}
+        />
+      )}
+      <div class="min-w-0 space-y-4">
       {sensitive.length > 0 && <SensitiveBar matches={sensitive} onSelect={showMatch} />}
       {switchedTo && (
         <div class="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand-soft/50 px-4 py-2.5 text-sm" role="status">
@@ -279,10 +366,10 @@ export function ReviewEmail() {
           status={status}
           onChange={(text) => setTask({ ...task, text })}
           onUse={() => { replaceDraft(task.text); setTask(null); }}
-          onDiscard={() => setTask(null)}
+          onDiscard={discard}
         />
       ) : (
-        <div class={`grid items-start gap-4 ${task ? 'lg:grid-cols-[minmax(0,1fr)_340px]' : ''}`}>
+        <div class={`grid items-start gap-4 ${task && !chatOn ? 'lg:grid-cols-[minmax(0,1fr)_340px]' : ''}`}>
           <section class="rounded-xl border border-line bg-surface shadow-card">
             <div class="flex items-center gap-2 border-b border-line px-4 py-2">
               <h3 class="whitespace-nowrap font-medium">{t('editor.title')}</h3>
@@ -327,6 +414,8 @@ export function ReviewEmail() {
           )}
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 }

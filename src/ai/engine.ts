@@ -422,6 +422,22 @@ async function mockGenerate(messages: Message[], onText: (text: string) => void)
     return lines.length ? [...lines, 'la patiente => le patient'].join('\n') : 'OK';
   }
   const draft = /<text>\n([\s\S]*)\n<\/text>/.exec(user)?.[1] ?? user;
+  if (system.includes('writing assistant')) {
+    // Assistant chat: a question if the request mentions a date, otherwise a short note and a new version.
+    const request = user.split('</text>').pop()!.trim();
+    await new Promise((r) => setTimeout(r, 600));
+    if (/date/i.test(request)) return /[àâéèêç]/.test(request) ? 'Quelle date voulez-vous indiquer?' : 'Which date should I use?';
+    const fr = /[àâéèêçù]/.test(draft);
+    const politer = draft.replace(/^(Bonjour|Hi)([^\n]*)/, fr ? 'Bonjour$2' : 'Hello$2').replace(/\n\n(merci|thx)\b/i, fr ? '\n\nMerci beaucoup et bonne journée,' : '\n\nThank you very much,');
+    let text = '';
+    const reply = `${fr ? 'J’ai rendu le ton plus poli et ajouté une formule de politesse.' : 'I made the tone more polite and added a closing line.'}\n<text>\n${politer}\n</text>`;
+    for (const word of reply.split(/(?<=\s)/)) {
+      text += word;
+      onText(text);
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    return text;
+  }
   const reply = system.includes('List up to')
     ? system.includes('in French')
       ? '- La date du congé n’est pas précisée.\n- Indiquez qui organise le transport.\n- « eval en physio » peut être flou pour la famille.'

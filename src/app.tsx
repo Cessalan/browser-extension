@@ -60,7 +60,7 @@ export function App() {
       {onLanding && <Landing onOpen={openApp} />}
       <div hidden={onLanding}>
       <header class="border-b border-line bg-nav text-ink">
-        <div class="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
+        <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           <a href="#/" class="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
             <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" class="h-8 w-8" />
             <h1 class="text-lg font-semibold tracking-tight">Confi</h1>
@@ -87,7 +87,7 @@ export function App() {
         </div>
       </header>
       <UpdateBanner />
-      <main class="mx-auto max-w-5xl px-4 py-6">
+      <main class="mx-auto max-w-6xl px-4 py-6">
         {onSetup && (
           <a href="#/" class="mx-auto mb-4 flex max-w-3xl items-center gap-1.5 text-sm text-muted hover:text-ink">
             <ArrowLeft size={15} aria-hidden="true" /> {t('nav.back')}
@@ -100,7 +100,7 @@ export function App() {
         {page === SpeedTest && <SpeedTest />}
         {page === Bench && <Bench />}
       </main>
-      <footer class="mx-auto flex max-w-5xl gap-4 px-4 pb-6 text-xs text-muted">
+      <footer class="mx-auto flex max-w-6xl gap-4 px-4 pb-6 text-xs text-muted">
         <span>{t('app.version', { v: __APP_VERSION__ })}</span>
         <a href="#/welcome" class="hover:text-ink">{t('land.about')}</a>
       </footer>
@@ -119,7 +119,7 @@ function UpdateBanner() {
   if (!needRefresh) return null;
   return (
     <div class="border-b border-brand/20 bg-brand-soft">
-      <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-2 text-sm">
+      <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-2 text-sm">
         <RefreshCw size={16} class="text-brand" aria-hidden="true" />
         <span class="font-medium">{t('update.available')}</span>
         <span class="text-xs text-muted">{t('update.draftHint')}</span>
