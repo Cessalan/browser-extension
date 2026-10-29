@@ -161,7 +161,7 @@ export function ReviewEmail() {
   /** Translates the draft into the other language (French ↔ English). */
   function translate() {
     const to = textLang === 'fr' ? 'en' : 'fr';
-    const label = t(to === 'en' ? 'translate.toEn' : 'translate.toFr');
+    const label = t(to === 'en' ? 'translate.inEn' : 'translate.inFr');
     void run({ kind: 'rewrite', label, original: draft, text: '', done: false, startedAt: Date.now(), translated: true }, (onText) =>
       translateText(draft, textLang, to, onText),
     );

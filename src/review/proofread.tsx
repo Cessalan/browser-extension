@@ -253,13 +253,16 @@ export function IssuePopover({
       </div>
       {issue.suggestions.length ? (
         <div class="mt-2 flex flex-wrap gap-1.5">
-          {issue.suggestions.map((s) => (
+          {issue.suggestions.map((s, i) => (
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded-md bg-brand px-2.5 py-1 text-sm font-medium text-white hover:brightness-110"
+              // The best fix stands out; alternatives stay quiet.
+              class={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm font-medium ${
+                i === 0 ? 'bg-brand text-white hover:brightness-110' : 'border border-line text-ink hover:border-brand/40 hover:bg-canvas'
+              }`}
               onClick={() => onFix(s)}
             >
-              <Check size={14} aria-hidden="true" /> {s || t('proof.remove')}
+              {i === 0 && <Check size={14} aria-hidden="true" />} {s || t('proof.remove')}
             </button>
           ))}
         </div>
