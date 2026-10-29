@@ -6,6 +6,7 @@ import {
 } from '../speedtest/models';
 import { getDeviceInfo } from '../speedtest/device';
 import { recommendMode } from '../speedtest/recommend';
+import { builtinAvailability, createBuiltinSession } from './builtin';
 import type { CpuMessage, CpuRequest } from './cpu.worker';
 import { cutRepetition } from './quality';
 
@@ -39,7 +40,7 @@ function isGpuLost(err: unknown) {
 /** What the app needs from a running model, whichever hardware it runs on. */
 interface Backend {
   /** Which hardware is doing the work (shown nowhere in the UI; used for decisions and support). */
-  kind: 'gpu' | 'cpu';
+  kind: 'builtin' | 'gpu' | 'cpu';
   generate(messages: Message[], onText: (text: string) => void, maxTokens: number): Promise<string>;
   stop(): void;
   unload(): Promise<void>;
@@ -140,6 +141,41 @@ async function startCpu(modelId: string, onProgress: Progress): Promise<Backend>
   };
 }
 
+/**
+ * Chrome's built-in AI. Each request gets a fresh session holding its own instructions and examples,
+ * so one request never sees another's text.
+ */
+async function startBuiltin(onProgress: Progress): Promise<Backend> {
+  // Starting a first session makes Chrome download its model if needed (with progress).
+  await createBuiltinSession([], (f) => onProgress(f, '')).then((s) => s.destroy());
+  let abort = new AbortController();
+  return {
+    kind: 'builtin',
+    async generate(messages, onText) {
+      abort = new AbortController();
+      const signal = abort.signal;
+      const turns = messages.map((m) => ({ role: m.role as 'system' | 'user' | 'assistant', content: String(m.content) }));
+      const last = turns.pop()!;
+      const session = await createBuiltinSession(turns, undefined, signal);
+      let text = '';
+      try {
+        // Chrome streams new pieces of the reply, not the whole reply so far.
+        for await (const piece of session.promptStreaming(last.content, { signal })) {
+          text += piece;
+          onText(text);
+        }
+      } catch (err) {
+        if (!signal.aborted) throw err;
+      } finally {
+        session.destroy();
+      }
+      return text;
+    },
+    stop: () => abort.abort(),
+    unload: async () => abort.abort(),
+  };
+}
+
 /** True if the CPU model's files are already in the browser cache (transformers.js keeps them in Cache Storage). */
 async function cpuModelCached(modelId: string) {
   try {
@@ -207,7 +243,9 @@ class LocalAI {
       const adapter = await navigator.gpu?.requestAdapter().catch(() => null);
       if (!adapter) return null;
       const f16 = adapter.features.has('shader-f16');
-      return { primary: resolveModelId(modeInfo(this.mode).modelId, f16), fallback: fallbackModelId(f16) };
+      // Chrome's built-in AI has no GPU model of its own; Standard is its stand-in if Chrome's AI fails.
+      const mode = modeInfo(this.mode).builtin ? DEFAULT_MODE : this.mode;
+      return { primary: resolveModelId(modeInfo(mode).modelId, f16), fallback: fallbackModelId(f16) };
     })();
     return this.modelIds;
   }
@@ -217,7 +255,9 @@ class LocalAI {
     let cached = false;
     try {
       const mode = await this.resolveMode();
-      if (modeInfo(mode).cpu) {
+      if (modeInfo(mode).builtin) {
+        cached = (await builtinAvailability()) === 'available';
+      } else if (modeInfo(mode).cpu) {
         cached = await cpuModelCached(CPU_MODE.modelId);
       } else {
         const ids = await this.getGpuModelIds();
@@ -238,8 +278,17 @@ class LocalAI {
       await navigator.storage?.persist?.().catch(() => false);
       const onProgress: Progress = (fraction, text) => this.set({ state: 'loading', fraction, text });
       const mode = await this.resolveMode();
-      let backend: Backend;
-      if (modeInfo(mode).cpu) {
+      let backend: Backend | null = null;
+      if (modeInfo(mode).builtin) {
+        backend = await startBuiltin(onProgress).catch((err) => {
+          // Chrome's AI can be switched off or missing: fall back to a model we download.
+          console.warn("Chrome's built-in AI unavailable, using a downloaded model instead", err);
+          return null;
+        });
+      }
+      if (backend) {
+        // Chrome's AI is running.
+      } else if (modeInfo(mode).cpu) {
         backend = await startCpu(CPU_MODE.modelId, onProgress);
       } else {
         const ids = await this.getGpuModelIds();
@@ -360,6 +409,18 @@ async function mockGenerate(messages: Message[], onText: (text: string) => void)
   }
   const system = String(messages[0].content);
   const user = String(messages.at(-1)?.content ?? '');
+  if (system.includes('=>')) {
+    // Proofreading: list corrections found in the text, plus one invented one that Confi must reject.
+    const known: [string, string][] = [
+      ['pouvez vous confirmer', 'pouvez-vous confirmer'],
+      ['rappelerait', 'rappellerait'],
+      ['we discussed tuesday', 'we discussed on Tuesday'],
+      ['orders are signed', 'the orders are signed'],
+    ];
+    const lines = known.filter(([wrong]) => user.includes(wrong)).map(([w, r]) => `${w} => ${r}`);
+    await new Promise((r) => setTimeout(r, 400));
+    return lines.length ? [...lines, 'la patiente => le patient'].join('\n') : 'OK';
+  }
   const draft = /<text>\n([\s\S]*)\n<\/text>/.exec(user)?.[1] ?? user;
   const reply = system.includes('List up to')
     ? system.includes('in French')

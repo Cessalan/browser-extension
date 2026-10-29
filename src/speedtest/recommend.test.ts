@@ -10,10 +10,15 @@ const strong: DeviceInfo = {
   shaderF16: true,
   gpu: 'amd gcn-5',
   storageFreeGB: 50,
-  builtInAI: 'available',
+  builtInAI: 'unavailable',
 };
 
 describe('recommendMode from specs', () => {
+  it("prefers Chrome's built-in AI when Chrome offers it, even without graphics", () => {
+    expect(recommendMode({ ...strong, builtInAI: 'available' })).toBe('chrome');
+    expect(recommendMode({ ...strong, webgpu: false, builtInAI: 'downloadable' })).toBe('chrome');
+  });
+
   it('picks Standard for a capable computer', () => {
     expect(recommendMode(strong)).toBe('standard');
   });

@@ -17,13 +17,17 @@
     "@tiptap/extensions": "^3.32.0",
     "@tiptap/pm": "^3.32.0",
     "@tiptap/starter-kit": "^3.32.0",
+    "dictionary-fr": "^3.0.0",
+    "harper.js": "^2.13.0",
     "lucide-preact": "^1.61.0",
     "marked": "^18.1.1",
+    "nspell": "^2.1.5",
     "preact": "^11.0.2"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/nspell": "^2.1.6",
     "@webgpu/types": "^0.1.74",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",

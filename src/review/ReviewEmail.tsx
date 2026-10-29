@@ -8,7 +8,8 @@ import {
   Info, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
-import { REWRITES, parseBullets, reviewMessages, type RewriteId } from './prompts';
+import { REWRITES, detectTextLang, parseBullets, reviewMessages, type RewriteId } from './prompts';
+import { IssuePopover, isSureFix, useProofread } from './proofread';
 import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
 
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
@@ -59,6 +60,8 @@ export function ReviewEmail() {
   const plain = useMemo(() => markdownToPlain(draft), [draft]);
   const sensitive = useMemo(() => findSensitive(plain), [plain]);
   const running = task !== null && !task.done;
+  // Underlines in the editor: spelling, grammar and shorthand, in the text's own language.
+  const proof = useProofread(editor, plain.trim() ? detectTextLang(plain) : lang);
   const words = countWords(plain);
 
   // Drafts are never saved, so warn before the tab closes with one in progress.
@@ -195,7 +198,14 @@ export function ReviewEmail() {
         <span class="mx-1 hidden h-6 w-px bg-line sm:block" />
         <span class="px-1 text-xs font-medium uppercase tracking-wide text-muted">{t('review.rewrite')}</span>
         {REWRITES.map((r) => (
-          <Button key={r.id} variant="secondary" icon={REWRITE_ICONS[r.id]} onClick={() => rewrite(t(r.label), draft, { id: r.id })} disabled={!canAct}>
+          <Button
+            key={r.id}
+            variant="secondary"
+            icon={REWRITE_ICONS[r.id]}
+            // Spelling & grammar: the AI suggests corrections in the editor (verified, one click each) instead of rewriting.
+            onClick={() => (r.id === 'fix' ? void proof.runAi() : rewrite(t(r.label), draft, { id: r.id }))}
+            disabled={!canAct || (r.id === 'fix' && proof.ai !== null) || (r.id === 'fix' && task?.kind === 'rewrite')}
+          >
             {t(r.label)}
           </Button>
         ))}
@@ -262,6 +272,7 @@ export function ReviewEmail() {
             <div class="flex items-center gap-2 border-b border-line px-4 py-2">
               <h3 class="whitespace-nowrap font-medium">{t('editor.title')}</h3>
               <span class="whitespace-nowrap text-xs text-muted">{t('editor.words', { n: words })}</span>
+              {plain.trim() && <ProofSummary proof={proof} />}
               <div class="ml-auto flex gap-1">
                 <Button variant="ghost" onClick={() => { setEditorContent(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
                   {t('editor.undo')}
@@ -302,6 +313,47 @@ export function ReviewEmail() {
         </div>
       )}
     </div>
+  );
+}
+
+/** "3 suggestions · Fix all", and the AI's progress while it proofreads. */
+function ProofSummary({ proof }: { proof: ReturnType<typeof useProofread> }) {
+  const { t } = useI18n();
+  const n = proof.found.length;
+  const fixable = proof.found.some((f) => isSureFix(f.issue));
+  return (
+    <span class="flex min-w-0 items-center gap-2 text-xs">
+      <span class="h-3 w-px bg-line" aria-hidden="true" />
+      {proof.ai ? (
+        <>
+          <LoaderCircle size={13} class="animate-spin text-brand" aria-hidden="true" />
+          <span class="whitespace-nowrap text-muted">{t('proof.aiRunning', { done: proof.ai.done, total: proof.ai.total })}</span>
+          <button type="button" class="text-muted underline hover:text-ink" onClick={proof.stopAi}>{t('proof.stop')}</button>
+        </>
+      ) : n === 0 ? (
+        <span class="inline-flex items-center gap-1 whitespace-nowrap text-good">
+          <Check size={13} aria-hidden="true" /> {t('proof.none')}
+        </span>
+      ) : (
+        <>
+          <span class="whitespace-nowrap font-medium text-ink">{n === 1 ? t('proof.count1') : t('proof.count', { n })}</span>
+          {fixable && (
+            <button type="button" class="whitespace-nowrap font-medium text-brand hover:underline" onClick={proof.fixAll}>
+              {t('proof.fixAll')}
+            </button>
+          )}
+        </>
+      )}
+      {proof.active && (
+        <IssuePopover
+          entry={proof.active.entry}
+          rect={proof.active.rect}
+          onFix={(s) => proof.fix(proof.active!.entry, s)}
+          onIgnore={() => proof.ignore(proof.active!.entry)}
+          onClose={proof.close}
+        />
+      )}
+    </span>
   );
 }
 
@@ -553,7 +605,8 @@ function AiPill({ status }: { status: AiStatus }) {
     default:
       return status.cached === false ? (
         <button type="button" class={`${pill} hover:bg-canvas`} onClick={() => void ai.load().catch(() => {})}>
-          <Download size={13} aria-hidden="true" /> {t('ai.download', { mb: modeInfo(ai.mode).downloadMB })}
+          <Download size={13} aria-hidden="true" />{' '}
+          {modeInfo(ai.mode).builtin ? t('ai.downloadChrome') : t('ai.download', { mb: modeInfo(ai.mode).downloadMB })}
         </button>
       ) : null;
   }

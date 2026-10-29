@@ -1,20 +1,23 @@
 /**
- * What people choose between. They see "Faster / Standard / Smarter" (or "Compatible"), never model names.
+ * What people choose between. They see "Built into Chrome", "Faster / Standard / Smarter" or "Compatible", never model names.
  * Sizes are approximate one-time downloads.
  * GPU modes run on WebLLM (WebGPU). "Compatible" runs on the CPU (transformers.js / WebAssembly) for
  * computers without usable graphics: no GPU, virtual desktops, graphics acceleration turned off.
  */
-export type AiMode = 'compat' | 'fast' | 'standard' | 'smart';
+export type AiMode = 'chrome' | 'compat' | 'fast' | 'standard' | 'smart';
 
-export const AI_MODES: { mode: AiMode; modelId: string; downloadMB: number; cpu?: true }[] = [
+export const AI_MODES: { mode: AiMode; modelId: string; downloadMB: number; cpu?: true; builtin?: true }[] = [
+  // Chrome's own on-device AI: much larger than what we download, and Chrome handles the download.
+  { mode: 'chrome', modelId: 'Chrome built-in AI (Gemini Nano)', downloadMB: 0, builtin: true },
   { mode: 'compat', modelId: 'onnx-community/Qwen2.5-0.5B-Instruct', downloadMB: 500, cpu: true },
   { mode: 'fast', modelId: 'Qwen3-0.6B-q4f16_1-MLC', downloadMB: 400 },
   { mode: 'standard', modelId: 'gemma3-1b-it-q4f16_1-MLC', downloadMB: 700 },
   { mode: 'smart', modelId: 'Qwen3-1.7B-q4f16_1-MLC', downloadMB: 1100 },
 ];
 
-export const GPU_MODES = AI_MODES.filter((m) => !m.cpu);
+export const GPU_MODES = AI_MODES.filter((m) => !m.cpu && !m.builtin);
 export const CPU_MODE = AI_MODES.find((m) => m.cpu)!;
+export const BUILTIN_MODE = AI_MODES.find((m) => m.builtin)!;
 
 export const DEFAULT_MODE: AiMode = 'standard';
 

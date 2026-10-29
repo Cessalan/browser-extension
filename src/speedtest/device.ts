@@ -1,3 +1,5 @@
+import { builtinAvailability } from '../ai/builtin';
+
 export interface DeviceInfo {
   browser: string;
   cores: number | null;
@@ -37,9 +39,8 @@ export async function getDeviceInfo(): Promise<DeviceInfo> {
     info.storageFreeGB = round((est.quota - (est.usage ?? 0)) / 1e9, 1);
   }
 
-  // Chrome's on-device Gemini Nano (Prompt API). Only some Chrome versions expose it to websites.
-  const LM = (globalThis as { LanguageModel?: { availability(): Promise<string> } }).LanguageModel;
-  if (LM) info.builtInAI = await LM.availability().catch(() => 'error');
+  // Chrome's on-device Gemini Nano (Prompt API). Only recent Chrome versions expose it to websites.
+  if ('LanguageModel' in globalThis) info.builtInAI = await builtinAvailability().catch(() => 'error');
 
   return info;
 }

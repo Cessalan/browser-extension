@@ -35,9 +35,9 @@ registerRoute(
   new NavigationRoute(async ({ request }) => isolate((await matchPrecache('index.html')) ?? (await fetch(request)))),
 );
 
-// The AI engines (large scripts and WebAssembly) are cached the first time they're used.
+// The AI and spelling engines (large scripts, WebAssembly, dictionaries) are cached the first time they're used.
 registerRoute(
-  ({ url }) => url.origin === self.location.origin && /\/assets\/.+\.(js|wasm|mjs)$/.test(url.pathname),
+  ({ url }) => url.origin === self.location.origin && /\/assets\/.+\.(js|wasm|mjs|aff|dic)$/.test(url.pathname),
   new CacheFirst({ cacheName: 'ai-engines', plugins: [isolatePlugin] }),
 );
 

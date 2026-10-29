@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import {
-  Brain, Check, Cpu, ChevronRight, CircleCheck, CircleX, Copy, HardDrive, MemoryStick, Mic, Monitor, MonitorCheck, ShieldCheck, Sparkles,
+  Brain, Check, Cpu, Globe, ChevronRight, CircleCheck, CircleX, Copy, HardDrive, MemoryStick, Mic, Monitor, MonitorCheck, ShieldCheck, Sparkles,
   Star, TriangleAlert, UserX, WifiOff, Zap, type LucideIcon,
 } from 'lucide-preact';
 import { Button, Card, ProgressBar, type Progress } from '../ui';
@@ -10,11 +10,11 @@ import { ai } from '../ai/engine';
 import { getDeviceInfo, type DeviceInfo } from './device';
 import type { LlmResult } from './llm';
 import type { SttResult } from './stt';
-import { CPU_MODE, GPU_MODES, modeInfo, resolveModelId, type AiMode, gpuResetCount } from './models';
+import { modeInfo, resolveModelId, type AiMode, gpuResetCount } from './models';
 import { formatReport, llmVerdict, sttVerdict, type Verdict } from './report';
-import { MODE_ORDER, isSoftwareGpu, recommendMode } from './recommend';
+import { MODE_ORDER, isSoftwareGpu, modesFor, recommendMode, shownModeFor } from './recommend';
 
-const MODE_ICONS: Record<AiMode, LucideIcon> = { compat: Cpu, fast: Zap, standard: Star, smart: Brain };
+const MODE_ICONS: Record<AiMode, LucideIcon> = { chrome: Globe, compat: Cpu, fast: Zap, standard: Star, smart: Brain };
 
 /**
  * "Setup" page: is this computer ready, and which AI mode to use.
@@ -49,10 +49,9 @@ export function SpeedTest() {
     void ai.setMode(next);
   }
 
-  // Without usable graphics only the processor ("Compatible") mode can run.
-  const usableGpu = !!device?.webgpu && !isSoftwareGpu(device);
-  const modes = usableGpu ? GPU_MODES : [CPU_MODE];
-  const shownMode: AiMode = usableGpu ? mode : 'compat';
+  // Chrome's AI when Chrome offers it; without usable graphics, only the processor ("Compatible") mode otherwise.
+  const modes = modesFor(device);
+  const shownMode: AiMode = device ? shownModeFor(device, mode) : mode;
 
   async function testLlm() {
     if (!device) return;
@@ -65,7 +64,7 @@ export function SpeedTest() {
       const { runCpuTest, runLlmTest } = await import('./llm');
       const report = (fraction: number) => setLlmProgress({ fraction, text: progressText(t, fraction) });
       const result =
-        shownMode === 'compat'
+        shownMode === 'compat' || shownMode === 'chrome'
           ? await runCpuTest(report)
           : await runLlmTest(resolveModelId(modeInfo(mode).modelId, device.shaderF16), report);
       setLlm({ ...result, mode: shownMode });
@@ -139,7 +138,7 @@ export function SpeedTest() {
                   </span>
                   <span class="mt-0.5 block text-sm text-muted">{t(`mode.${m.mode}.desc` as Key)}</span>
                 </span>
-                <span class="hidden shrink-0 self-center text-xs text-muted sm:block">~{m.downloadMB} {t('setup.mb')}</span>
+                <span class="hidden shrink-0 self-center text-xs text-muted sm:block">{m.builtin ? t('setup.byChrome') : `~${m.downloadMB} ${t('setup.mb')}`}</span>
                 <span
                   class={`mt-2.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border-2 ${selected ? 'border-brand' : 'border-line group-hover:border-brand/50'}`}
                   aria-hidden="true"
@@ -275,6 +274,8 @@ function ReadyBanner({
   } else if (device && llm) {
     const v = llmVerdict(llm.tokensPerSecond);
     [tone, title] = v === 'good' ? ['good', 'setup.ready'] : v === 'ok' ? ['warn', 'setup.okSlow'] : ['bad', 'setup.slow'];
+  } else if (device && current === 'chrome') {
+    [tone, title, hint] = ['good', 'setup.chromeTitle', 'setup.chromeHint'];
   } else if (device && !usableGpu) {
     [tone, title, hint] = ['info', 'setup.compatTitle', 'land.start.noGpu'];
   } else if (device) {
@@ -288,7 +289,8 @@ function ReadyBanner({
     info: ['bg-brand-soft text-brand ring-brand/20', MonitorCheck],
   } as const;
   const [badge, Icon] = style[tone];
-  const heavierThanFit = recommended != null && MODE_ORDER.indexOf(current) > MODE_ORDER.indexOf(recommended);
+  const heavierThanFit =
+    recommended != null && MODE_ORDER.includes(current) && MODE_ORDER.includes(recommended) && MODE_ORDER.indexOf(current) > MODE_ORDER.indexOf(recommended);
 
   return (
     <section class="rounded-xl border border-line bg-surface p-5 shadow-card">
@@ -299,7 +301,7 @@ function ReadyBanner({
         <div class="min-w-0 flex-1">
           <p class="text-base font-semibold tracking-tight">{t(title)}</p>
           {hint && <p class="mt-0.5 text-sm text-muted">{t(hint)}</p>}
-          {usableGpu && recommended && recommended !== current && (
+          {(usableGpu || recommended === 'chrome') && recommended && recommended !== current && (
             !llm && heavierThanFit ? (
               <p class="mt-2 text-sm text-muted">{t('setup.testFirst')}</p>
             ) : (

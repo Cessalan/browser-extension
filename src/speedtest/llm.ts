@@ -61,12 +61,12 @@ export async function runLlmTest(
 }
 
 /**
- * Speed test for "Compatible" (processor) mode, run through the shared AI engine.
- * The CPU engine doesn't report token counts, so speed is estimated from characters (~4 per token).
+ * Speed test for "Compatible" (processor) and Chrome's built-in AI, run through the shared AI engine.
+ * Neither reports token counts, so speed is estimated from characters (~4 per token).
  */
 export async function runCpuTest(onProgress: (fraction: number) => void): Promise<LlmResult> {
   const { ai } = await import('../ai/engine');
-  const { CPU_MODE } = await import('./models');
+  const { modeInfo } = await import('./models');
   const wasCached = ai.status.state === 'ready' || (ai.status.state === 'idle' && ai.status.cached === true);
   const unsubscribe = ai.subscribe((s) => s.state === 'loading' && onProgress(s.fraction));
   const t0 = performance.now();
@@ -93,7 +93,7 @@ export async function runCpuTest(onProgress: (fraction: number) => void): Promis
   const end = performance.now();
   const writingSeconds = Math.max(0.1, (end - (first || t1)) / 1000);
   return {
-    modelId: CPU_MODE.modelId,
+    modelId: modeInfo(ai.mode).modelId,
     wasCached,
     loadSeconds,
     firstTokenSeconds: ((first || end) - t1) / 1000,

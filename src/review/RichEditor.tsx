@@ -6,6 +6,7 @@ import { Placeholder } from '@tiptap/extensions';
 import { Bold, Highlighter, Italic, List, ListOrdered, RemoveFormatting, Underline, type LucideIcon } from 'lucide-preact';
 import { useI18n, type Key } from '../i18n';
 import { docToMarkdown, markdownToHtml } from './format';
+import { Proofread } from './proofread';
 
 /** Rich text editor for emails: bold, italic, underline, highlight, lists and links. Reports Markdown. */
 export function RichEditor({
@@ -48,9 +49,11 @@ export function RichEditor({
         }),
         Highlight,
         Placeholder.configure({ placeholder: placeholder ?? '' }),
+        Proofread,
       ],
       editorProps: {
-        attributes: { class: `confi-editor outline-none ${className}`, spellcheck: 'true' },
+        // Confi's own proofreading replaces the browser's spell check.
+        attributes: { class: `confi-editor outline-none ${className}`, spellcheck: 'false' },
         handleKeyDown: (_view, event) => {
           if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && callbacks.current.onSubmit) {
             callbacks.current.onSubmit();
