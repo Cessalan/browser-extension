@@ -5,12 +5,13 @@ import { Button } from '../ui';
 import { useI18n, type Key, type Lang } from '../i18n';
 import {
   Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
-  Info, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
+  Info, Languages, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
 import { REWRITES, detectTextLang, parseBullets, reviewMessages, type RewriteId } from './prompts';
 import { IssuePopover, isSureFix, useProofread } from './proofread';
 import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
+import { translateText } from '../ai/translate';
 
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
 import { countChanges, diffWords, type DiffPart } from './diff';
@@ -35,7 +36,8 @@ thx
 Jordan` };
 
 type Review = { kind: 'review'; text: string; done: boolean; forDraft: string; startedAt: number };
-type Rewrite = { kind: 'rewrite'; label: string; original: string; text: string; done: boolean; startedAt: number };
+/** `translated`: the suggestion is in the other language, so it's shown side by side without highlighting changes. */
+type Rewrite = { kind: 'rewrite'; label: string; original: string; text: string; done: boolean; startedAt: number; translated?: boolean };
 type Task = Review | Rewrite;
 /** Runs one AI request, streaming the text so far; returns the final text. */
 type Exec = (onText: (text: string) => void) => Promise<string>;
@@ -61,7 +63,8 @@ export function ReviewEmail() {
   const sensitive = useMemo(() => findSensitive(plain), [plain]);
   const running = task !== null && !task.done;
   // Underlines in the editor: spelling, grammar and shorthand, in the text's own language.
-  const proof = useProofread(editor, plain.trim() ? detectTextLang(plain) : lang);
+  const textLang = plain.trim() ? detectTextLang(plain) : lang;
+  const proof = useProofread(editor, textLang);
   const words = countWords(plain);
 
   // Drafts are never saved, so warn before the tab closes with one in progress.
@@ -149,9 +152,18 @@ export function ReviewEmail() {
   }
 
   /** `original` is what the diff compares against; `input` is what gets rewritten (a previous suggestion when refining). */
-  function rewrite(label: string, original: string, job: RewriteJob, input = original) {
-    void run({ kind: 'rewrite', label, original, text: '', done: false, startedAt: Date.now() }, (onText) =>
+  function rewrite(label: string, original: string, job: RewriteJob, input = original, translated = false) {
+    void run({ kind: 'rewrite', label, original, text: '', done: false, startedAt: Date.now(), translated }, (onText) =>
       rewriteText(job, input, onText).then((r) => r.text),
+    );
+  }
+
+  /** Translates the draft into the other language (French ↔ English). */
+  function translate() {
+    const to = textLang === 'fr' ? 'en' : 'fr';
+    const label = t(to === 'en' ? 'translate.toEn' : 'translate.toFr');
+    void run({ kind: 'rewrite', label, original: draft, text: '', done: false, startedAt: Date.now(), translated: true }, (onText) =>
+      translateText(draft, textLang, to, onText),
     );
   }
 
@@ -163,7 +175,7 @@ export function ReviewEmail() {
     if (!text || running) return;
     if (task?.kind === 'rewrite' && task.done) {
       // Keep diffing against the user's original email.
-      rewrite(quote(text, lang), task.original, { instruction: text }, task.text);
+      rewrite(quote(text, lang), task.original, { instruction: text }, task.text, task.translated);
     } else if (plain.trim()) {
       rewrite(quote(text, lang), draft, { instruction: text });
     } else {
@@ -209,6 +221,9 @@ export function ReviewEmail() {
             {t(r.label)}
           </Button>
         ))}
+        <Button variant="secondary" icon={Languages} onClick={translate} disabled={!canAct}>
+          {t(textLang === 'fr' ? 'translate.toEn' : 'translate.toFr')}
+        </Button>
         <InstructionBox
           trailing={needsAttention(status) ? <AiPill status={status} /> : undefined}
           value={instruction}
@@ -377,7 +392,7 @@ function Compare({
     if (!task.done) setEditing(false);
   }, [task.done]);
   const parts = useMemo(
-    () => (task.done ? diffWords(markdownToPlain(task.original), markdownToPlain(task.text)) : null),
+    () => (task.done && !task.translated ? diffWords(markdownToPlain(task.original), markdownToPlain(task.text)) : null),
     [task.done, task.original, task.text],
   );
   const changes = parts && countChanges(parts);
@@ -407,11 +422,17 @@ function Compare({
             </div>
           ) : (
             <div
-              class={`min-h-[300px] whitespace-pre-wrap p-4 text-[15px] leading-relaxed ${parts ? 'cursor-text rounded-b-xl hover:bg-white/60' : ''}`}
-              onClick={() => parts && setEditing(true)}
-              title={parts ? t('compare.clickToEdit') : undefined}
+              class={`min-h-[300px] whitespace-pre-wrap p-4 text-[15px] leading-relaxed ${task.done ? 'cursor-text rounded-b-xl hover:bg-white/60' : ''}`}
+              onClick={() => task.done && setEditing(true)}
+              title={task.done ? t('compare.clickToEdit') : undefined}
             >
-              {parts ? <DiffText parts={parts} side="after" /> : <Streaming text={markdownToPlain(task.text)} startedAt={task.startedAt} status={status} />}
+              {parts ? (
+                <DiffText parts={parts} side="after" />
+              ) : task.done ? (
+                markdownToPlain(task.text)
+              ) : (
+                <Streaming text={markdownToPlain(task.text)} startedAt={task.startedAt} status={status} />
+              )}
             </div>
           )}
         </div>
@@ -420,7 +441,7 @@ function Compare({
         {task.done ? (
           <>
             <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
-            <span class="text-xs text-muted">{editing ? (
+            <span class="text-xs text-muted">{editing && parts ? (
               <button type="button" class="underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
             ) : t('compare.clickToEdit')}</span>
             {changes && (

@@ -33,7 +33,7 @@ describe('rewriteText', () => {
       (s) => s.replace('la famille', 'La famille'),
     );
     const { text, keptAsIs } = await rewriteText({ id: 'fix' }, email, () => {});
-    expect(sent[1]).toBe('le patient [X1] est pret pour son congé vendredi.'); // the AI never sees the date of birth
+    expect(sent[1]).toBe('le patient né le [X1] est pret pour son congé vendredi.'); // the AI never sees the date of birth
     expect(text).toBe('Bonjour Dre Roy,\n\nLe patient né le 14/03/1952 est prêt pour son congé vendredi.\n\nLa famille demande pour le transport, on va les rappeler au (514) 555-0187.\n\nJordan');
     expect(keptAsIs).toBe(0);
   });
@@ -58,7 +58,7 @@ describe('rewriteText', () => {
   it('rewrites the whole text for restructuring, and rejects a reply that lost a detail', async () => {
     replies.push((s) => s.replace('[X2]', ''));
     await expect(rewriteText({ id: 'shorter' }, email, () => {})).rejects.toBeInstanceOf(UnreliableError);
-    replies.push(() => `Bonjour Dre Roy, le patient [X1] part vendredi. Famille à rappeler au [X2].`);
+    replies.push(() => `Bonjour Dre Roy, le patient né le [X1] part vendredi. Famille à rappeler au [X2].`);
     const { text } = await rewriteText({ id: 'shorter' }, email, () => {});
     expect(text).toBe('Bonjour Dre Roy, le patient né le 14/03/1952 part vendredi. Famille à rappeler au (514) 555-0187.');
   });
