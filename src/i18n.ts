@@ -94,6 +94,11 @@ const en = {
   'kind.email': 'Email address',
   'kind.date': 'Date',
   'kind.id': 'Long ID number',
+  'kind.name': 'Name',
+  'kind.address': 'Address',
+  'kind.place': 'Place',
+  'sensitive.forget': 'Not private: stop protecting it',
+  'sensitive.byAi': 'Found by the AI',
 
   // Setup (device check + AI mode)
   'setup.title': 'Setup',
@@ -385,6 +390,11 @@ const fr: Record<Key, string> = {
   'kind.email': 'Adresse courriel',
   'kind.date': 'Date',
   'kind.id': "Long numéro d'identification",
+  'kind.name': 'Nom',
+  'kind.address': 'Adresse',
+  'kind.place': 'Lieu',
+  'sensitive.forget': 'Pas confidentiel : ne plus le protéger',
+  'sensitive.byAi': 'Repéré par l’IA',
 
   'setup.title': 'Configuration',
   'setup.intro': "Vérifiez que cet ordinateur peut faire fonctionner Confi et choisissez comment l'IA fonctionne. Tout reste sur cet ordinateur.",

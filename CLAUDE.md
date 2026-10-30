@@ -15,6 +15,7 @@ This project is unrelated to NurseQuizAI.
   - Translation FR ↔ EN (`src/ai/translate.ts`): Chrome's built-in Translator when available, else Confi's AI; line by line, details locked as [X1] markers.
   - Small-model quality: `prompts.ts` writes prompts in the text's own language with a worked example; `rewrite.ts` locks sensitive details as [X1] markers (`src/ai/mask.ts`), rewrites fix/professional paragraph by paragraph, and keeps a paragraph as-is if the AI lost a detail or went off-topic.
   - `src/bench/` (`#/bench`, linked from Setup's technical details): runs made-up samples through the real pipeline and scores them. Use it to tune prompts.
+  - Names, addresses, places (`src/check/names.ts`): in "Built into Chrome" mode, the AI lists them shortly after typing stops; Confi keeps only those really in the text and protects them like numbers (`learnDetails` in `sensitive.ts`, memory only). The person can un-protect one (✕ on its chip).
   - Rich text editor: TipTap (`RichEditor.tsx`). The draft is stored as Markdown (`format.ts`) because that is what the AI reads and writes; copy puts HTML + plain text on the clipboard. `sensitive.ts` flags patient identifiers without AI.
 - `src/speedtest/`: the Setup page (device check + AI mode). AI runs in Web Workers (`*.worker.ts`).
   - Text: WebLLM (`llm.ts`). `models.ts` maps AI modes (Faster / Standard / Smarter) to models.

@@ -430,6 +430,15 @@ async function mockGenerate(messages: Message[], onText: (text: string) => void)
     return lines.length ? [...lines, 'la patiente => le patient'].join('\n') : 'OK';
   }
   const draft = /<text>\n([\s\S]*)\n<\/text>/.exec(user)?.[1] ?? user;
+  if (system.includes('identify a specific person')) {
+    // Name finder: titled names and street addresses, plus one invented name Confi must reject.
+    const details = [
+      ...[...user.matchAll(/\b(?:Dre?|Mme|Dr\.)\s+\p{Lu}[\p{L}-]+/gu)].map((m) => ({ text: m[0], kind: 'name' })),
+      ...[...user.matchAll(/\d+,? rue [\p{L} -]+?(?=[,.]|$)/gu)].map((m) => ({ text: m[0], kind: 'address' })),
+      { text: 'Jean Invented', kind: 'name' },
+    ];
+    return JSON.stringify({ details });
+  }
   if (system.includes('writing assistant')) {
     // Assistant chat: a question if the request mentions a date, otherwise a short note and a new version.
     const request = user.split('</text>').pop()!.trim();

@@ -7,7 +7,8 @@ import {
   Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb,
   Info, Languages, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
-import { findSensitive, type SensitiveMatch } from './sensitive';
+import { findSensitive, forgetDetail, learnDetails, type SensitiveMatch } from './sensitive';
+import { findNamesWithAi } from '../check/names';
 import { REWRITES, detectTextLang, parseBullets, reviewMessages, type RewriteId } from './prompts';
 import { IssuePopover, isSureFix, useProofread } from './proofread';
 import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
@@ -64,7 +65,9 @@ export function ReviewEmail() {
   const [editor, setEditor] = useState<Editor | null>(null);
 
   const plain = useMemo(() => markdownToPlain(draft), [draft]);
-  const sensitive = useMemo(() => findSensitive(plain), [plain]);
+  // Bumped when the AI finds names/addresses (or one is un-protected), so the protected list updates.
+  const [learnedVersion, setLearnedVersion] = useState(0);
+  const sensitive = useMemo(() => findSensitive(plain), [plain, learnedVersion]);
   const running = task !== null && !task.done;
   // Underlines in the editor: spelling, grammar and shorthand, in the text's own language.
   const textLang = plain.trim() ? detectTextLang(plain) : lang;
@@ -255,6 +258,24 @@ export function ReviewEmail() {
     setTask(null);
   }
 
+  // With Chrome's AI (fast), look for names, addresses and places shortly after typing stops; they get protected too.
+  const findingNames = useRef(false);
+  useEffect(() => {
+    if (!chatOn || status.state !== 'ready' || !plain.trim()) return;
+    const timer = setTimeout(async () => {
+      if (findingNames.current) return;
+      findingNames.current = true;
+      try {
+        if (learnDetails(await findNamesWithAi(plain))) setLearnedVersion((v) => v + 1);
+      } catch {
+        // Not critical: the patterns still protect numbers.
+      } finally {
+        findingNames.current = false;
+      }
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [plain, chatOn, status.state]);
+
   /** Translates the draft into the other language (French ↔ English). */
   function translate() {
     const to = textLang === 'fr' ? 'en' : 'fr';
@@ -341,7 +362,16 @@ export function ReviewEmail() {
         />
       )}
       <div class="min-w-0 space-y-4">
-      {sensitive.length > 0 && <SensitiveBar matches={sensitive} onSelect={showMatch} />}
+      {sensitive.length > 0 && (
+        <SensitiveBar
+          matches={sensitive}
+          onSelect={showMatch}
+          onForget={(m) => {
+            forgetDetail(m.text);
+            setLearnedVersion((v) => v + 1);
+          }}
+        />
+      )}
       {switchedTo && (
         <div class="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand-soft/50 px-4 py-2.5 text-sm" role="status">
           <Info size={16} class="shrink-0 text-brand" aria-hidden="true" />
@@ -716,7 +746,15 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
   );
 }
 
-function SensitiveBar({ matches, onSelect }: { matches: SensitiveMatch[]; onSelect: (m: SensitiveMatch) => void }) {
+function SensitiveBar({
+  matches,
+  onSelect,
+  onForget,
+}: {
+  matches: SensitiveMatch[];
+  onSelect: (m: SensitiveMatch) => void;
+  onForget: (m: SensitiveMatch) => void;
+}) {
   const { lang, t } = useI18n();
   return (
     <div class="rounded-xl border border-brand/20 bg-surface px-4 py-3 text-sm shadow-card">
@@ -729,16 +767,30 @@ function SensitiveBar({ matches, onSelect }: { matches: SensitiveMatch[]; onSele
       </div>
       <div class="mt-2 flex flex-wrap gap-2 pl-9">
       {matches.map((m) => (
-        <button
-          type="button"
-          class="rounded-full border border-line bg-canvas px-2.5 py-0.5 text-xs text-ink hover:border-brand/40 hover:bg-brand-soft/50"
-          title={t('sensitive.jump')}
-          onClick={() => onSelect(m)}
-        >
-          {t(`kind.${m.kind}`)}
-          {lang === 'fr' ? ' : ' : ': '}
-          <code class="font-mono">{m.text}</code>
-        </button>
+        <span class="inline-flex items-center rounded-full border border-line bg-canvas text-xs text-ink hover:border-brand/40">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded-full py-0.5 pl-2.5 pr-2.5 hover:bg-brand-soft/50"
+            title={m.learned ? `${t('sensitive.byAi')} · ${t('sensitive.jump')}` : t('sensitive.jump')}
+            onClick={() => onSelect(m)}
+          >
+            {m.learned && <Sparkles size={11} class="text-brand" aria-hidden="true" />}
+            {t(`kind.${m.kind}`)}
+            {lang === 'fr' ? ' : ' : ': '}
+            <code class="font-mono">{m.text}</code>
+          </button>
+          {m.learned && (
+            <button
+              type="button"
+              class="-ml-1 mr-1 rounded-full p-0.5 text-muted hover:bg-white hover:text-ink"
+              title={t('sensitive.forget')}
+              aria-label={t('sensitive.forget')}
+              onClick={() => onForget(m)}
+            >
+              <X size={12} />
+            </button>
+          )}
+        </span>
       ))}
       </div>
     </div>
