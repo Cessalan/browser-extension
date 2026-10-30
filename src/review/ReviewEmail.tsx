@@ -542,7 +542,24 @@ function Compare({
           </div>
         </div>
         <div class="bg-brand-soft/30">
-          <PaneHeader title={t('compare.newVersion')} />
+          <PaneHeader
+            title={t('compare.newVersion')}
+            action={
+              task.done && (
+                // Where people look to copy: the corner of the text itself.
+                <button
+                  type="button"
+                  class={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    copied ? 'border-green-200 bg-green-50 text-good' : 'border-line bg-surface text-ink shadow-sm hover:border-brand/40 hover:text-brand'
+                  }`}
+                  onClick={() => void copyVersion()}
+                >
+                  {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+                  {copied ? t('editor.copied') : t('compare.copy')}
+                </button>
+              )
+            }
+          />
           {editing ? (
             <div class="bg-surface ring-2 ring-inset ring-brand/40">
               <RichEditor initialMarkdown={task.text} onChange={onChange} autofocus class="min-h-[300px] p-4 text-[15px] leading-relaxed" />
@@ -568,9 +585,6 @@ function Compare({
         {task.done ? (
           <>
             <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
-            <Button key="copy" variant="secondary" onClick={() => void copyVersion()} icon={copied ? Check : Copy}>
-              {copied ? t('editor.copied') : t('compare.copy')}
-            </Button>
             <Button key="keep" variant="ghost" onClick={onDiscard} title="Esc">{t('compare.keepMine')}</Button>
             {/* "Click to edit" is the new version's tooltip; the footer stays on one line. */}
             {editing && parts && (
