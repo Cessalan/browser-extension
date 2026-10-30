@@ -1,4 +1,5 @@
 import type { Message } from '../ai/engine';
+import { markersIn } from '../ai/mask';
 import type { Key, Lang } from '../i18n';
 import { getStyle } from '../style/store';
 import { styleInstructions } from '../style/style';
@@ -47,15 +48,17 @@ export function clearlyIn(text: string): TextLang | null {
   return fr >= en + 2 ? 'fr' : en >= fr + 2 ? 'en' : null;
 }
 
-const RULES: Record<TextLang, { base: string; keep: string; format: string }> = {
+const RULES: Record<TextLang, { base: string; keep: string; markers: string; format: string }> = {
   en: {
     base: 'You edit texts written by professionals. They may contain confidential details.',
-    keep: 'Keep every name, number, date, time, fact and marker like [X1] exactly as written. Do not add information. Reply with only the edited text.',
+    keep: 'Keep every name, number, date, time and fact exactly as written. Do not add information. Reply with only the edited text.',
+    markers: 'Keep markers like [X1] exactly as written.',
     format: 'Keep the Markdown formatting (**bold**, *italic*, lists) where it fits.',
   },
   fr: {
     base: 'Tu révises des textes écrits par des professionnels. Ils peuvent contenir des renseignements confidentiels.',
-    keep: 'Garde chaque nom, nombre, date, heure, fait et marqueur comme [X1] exactement tel quel. N’ajoute aucune information. Réponds uniquement avec le texte révisé.',
+    keep: 'Garde chaque nom, nombre, date, heure et fait exactement tel quel. N’ajoute aucune information. Réponds uniquement avec le texte révisé.',
+    markers: 'Garde les marqueurs comme [X1] exactement tels quels.',
     format: 'Garde la mise en forme Markdown (**gras**, *italique*, listes) quand elle convient.',
   },
 };
@@ -136,9 +139,16 @@ function wrap(text: string) {
   return `<text>\n${text}\n</text>`;
 }
 
+/** The "keep" rule, mentioning markers only when the text has some (otherwise small models invent one). */
+function keepRule(lang: TextLang, text: string): string {
+  const { keep, markers } = RULES[lang];
+  return markersIn(text).length ? `${keep} ${markers}` : keep;
+}
+
 export function rewriteMessages(id: RewriteId, text: string): Message[] {
   const lang = detectTextLang(text);
-  const { base, keep, format } = RULES[lang];
+  const { base, format } = RULES[lang];
+  const keep = keepRule(lang, text);
   const { instruction, example } = TASKS[id][lang];
   // Spelling fixes keep the person's words as they are; other rewrites follow their style (a little: this runs per paragraph).
   const style = id === 'fix' ? '' : styleInstructions(getStyle(), text, lang, 2, 250);
@@ -153,7 +163,8 @@ export function rewriteMessages(id: RewriteId, text: string): Message[] {
 /** The person's own instruction, in any language ("put the request first", "rends-le plus chaleureux"…). */
 export function customMessages(instruction: string, text: string): Message[] {
   const lang = detectTextLang(text);
-  const { base, keep, format } = RULES[lang];
+  const { base, format } = RULES[lang];
+  const keep = keepRule(lang, text);
   const apply = lang === 'fr' ? 'Applique la consigne de la personne au texte.' : 'Apply the person’s instruction to the text.';
   const style = styleInstructions(getStyle(), text, lang, 4, 600);
   return [

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lockDetails, markersIn, unlockDetails } from './mask';
+import { dropMarkers, lockDetails, markersIn, unlockDetails } from './mask';
 
 // Made-up data.
 const text = 'Patient né le 14/03/1952, dossier 4482913. Rappeler la fille au (514) 555-0187.';
@@ -23,5 +23,17 @@ describe('lockDetails / unlockDetails', () => {
 
   it('leaves text without details alone', () => {
     expect(lockDetails('Bonjour, merci.')).toEqual({ text: 'Bonjour, merci.', locked: new Map() });
+  });
+
+  it('drops markers the AI invented', () => {
+    expect(unlockDetails('Le rapport prend [X1] 7 jours.', new Map()).text).toBe('Le rapport prend 7 jours.');
+    expect(unlockDetails('[X2] Merci [x 3].', new Map()).text).toBe('Merci.');
+    expect(dropMarkers('Dossier [X1] et [X2].', ['[X1]'])).toBe('Dossier [X1] et.');
+  });
+
+  it('keeps a marker the person typed themselves', () => {
+    const { text: locked, locked: details } = lockDetails('Voir la note [X9].');
+    expect(locked).toBe('Voir la note [X1].');
+    expect(unlockDetails('See note [X1].', details).text).toBe('See note [X9].');
   });
 });

@@ -1,5 +1,5 @@
 import { ai } from '../ai/engine';
-import { lockDetails, markersIn, unlockDetails } from '../ai/mask';
+import { dropMarkers, lockDetails, markersIn, unlockDetails } from '../ai/mask';
 import { looksUnrelated } from '../ai/quality';
 import { markdownToPlain } from './format';
 import { cleanRewrite, customMessages, rewriteMessages, type RewriteId } from './prompts';
@@ -53,7 +53,8 @@ export async function rewriteText(
     // Paragraph by paragraph, a paragraph appears only once it's checked, so the person never sees one
     // that gets swapped back. A whole-text rewrite streams as it's written.
     const onPiece = byParagraph ? () => {} : (t: string) => show(normalizeMarkers(cleanRewrite(t)));
-    const reply = normalizeMarkers(cleanRewrite(await ai.generate(messages, onPiece, maxTokens)));
+    // A marker from another paragraph would copy that detail here: drop it like an invented one.
+    const reply = dropMarkers(normalizeMarkers(cleanRewrite(await ai.generate(messages, onPiece, maxTokens))), markersIn(piece));
 
     const lostDetail = markersIn(piece).some((m) => !reply.includes(m));
     // Custom instructions may ask for a translation, so only built-in edits are checked for relevance.
