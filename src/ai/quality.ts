@@ -49,3 +49,11 @@ export function looksUnrelated(original: string, suggestion: string): boolean {
   for (const w of before) if (after.has(w)) shared++;
   return shared / before.size < 0.2;
 }
+
+/**
+ * Removes a model's "thinking" (Qwen 3 writes <think>…</think> before answering, sometimes empty
+ * even with thinking turned off). While it streams, an unclosed <think> hides everything after it.
+ */
+export function stripThinking(text: string): string {
+  return text.replace(/<think>[\s\S]*?(?:<\/think>|$)\s*/g, '').replace(/^\s*<\/think>\s*/, '');
+}

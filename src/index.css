@@ -87,3 +87,25 @@ body {
   .shimmer, .shimmer-text, .progress-shine::after { animation: none; }
   .shimmer-text { color: var(--color-muted); }
 }
+
+/* Download: the bar's track sweeps while there's no progress yet; messages fade in as they rotate. */
+.progress-wait::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(2 120 184 / 0.18), transparent);
+  animation: confi-sweep 1.6s ease-in-out infinite;
+}
+@keyframes confi-fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.fade-up { animation: confi-fade-up 0.4s ease-out both; }
+@keyframes confi-ring {
+  0% { box-shadow: 0 0 0 0 rgb(2 120 184 / 0.35); }
+  100% { box-shadow: 0 0 0 12px rgb(2 120 184 / 0); }
+}
+.pulse-ring { animation: confi-ring 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .progress-wait::before, .fade-up, .pulse-ring { animation: none; }
+}

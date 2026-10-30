@@ -54,7 +54,7 @@ export function ProgressBar({ progress }: { progress: Progress }) {
   if (!progress) return null;
   return (
     <div class="mt-3">
-      <div class="h-2 overflow-hidden rounded-full bg-brand-soft">
+      <div class={`relative h-2 overflow-hidden rounded-full bg-brand-soft ${progress.fraction < 0.02 ? 'progress-wait' : ''}`}>
         <div class="progress-shine h-full rounded-full bg-brand transition-all" style={{ width: `${Math.round(progress.fraction * 100)}%` }} />
       </div>
       <p class="mt-1 truncate text-xs text-muted">{progress.text}</p>

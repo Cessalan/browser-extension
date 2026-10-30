@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { deviceKind, forDevice } from './device';
 
 export type Lang = 'en' | 'fr';
 
@@ -17,7 +18,6 @@ const en = {
   'ai.starting': 'AI starting {pct}%',
   'ai.retry': "AI couldn't start · Retry",
   'ai.download': 'Download AI (~{mb} MB, once)',
-  'ai.startingLong': 'Starting the AI… {pct}%',
   'ai.firstTimeOnly': 'First time only. After this it starts in seconds.',
   'ai.gpuLost.title': 'Your computer’s graphics chip was reset',
   'ai.gpuLost.text': 'The AI overloaded it, which is common on laptops. Your text is safe. Compatible mode uses the processor instead: a little slower, but steadier.',
@@ -168,6 +168,13 @@ const en = {
   'chat.setAside': 'The new version changed a protected detail, so Confi set it aside. Try asking again.',
   'chat.failed': 'Something went wrong. Try again.',
   'chat.private': 'This conversation stays on this computer and is erased when you close the tab.',
+  'download.msg.downloading': 'Downloading the AI to this computer…',
+  'download.msg.chrome': 'Chrome is installing its built-in AI…',
+  'download.msg.private': 'What you write will never leave this computer.',
+  'download.msg.offline': 'Only once: afterwards Confi works even offline.',
+  'download.msg.finishing': 'Almost ready: setting up the AI…',
+  'device.note.mobile': 'On this computer, Confi uses a lighter AI. For long texts, Chrome on a computer gives the best results.',
+  'device.note.useChrome': 'Tip: in Chrome, Confi uses Chrome’s built-in AI, faster and better at writing. Still 100% on this computer.',
   'translate.toEn': 'Translate to English',
   'translate.toFr': 'Translate to French',
   'translate.inEn': 'In English',
@@ -318,7 +325,6 @@ const fr: Record<Key, string> = {
   'ai.starting': "Démarrage de l'IA {pct} %",
   'ai.retry': "L'IA n'a pas démarré · Réessayer",
   'ai.download': "Télécharger l'IA (~{mb} Mo, une fois)",
-  'ai.startingLong': "Démarrage de l'IA… {pct} %",
   'ai.firstTimeOnly': 'La première fois seulement. Ensuite, elle démarre en quelques secondes.',
   'ai.gpuLost.title': 'La puce graphique de votre ordinateur a été réinitialisée',
   'ai.gpuLost.text': 'L’IA l’a surchargée, ce qui est courant sur les portables. Votre texte est intact. Le mode Compatible utilise plutôt le processeur : un peu plus lent, mais plus stable.',
@@ -463,6 +469,13 @@ const fr: Record<Key, string> = {
   'chat.setAside': 'La nouvelle version modifiait un renseignement protégé, alors Confi l’a écartée. Redemandez.',
   'chat.failed': 'Un problème est survenu. Réessayez.',
   'chat.private': 'Cette conversation reste sur cet ordinateur et s’efface quand vous fermez l’onglet.',
+  'download.msg.downloading': 'Téléchargement de l’IA sur cet ordinateur…',
+  'download.msg.chrome': 'Chrome installe son IA intégrée…',
+  'download.msg.private': 'Ce que vous écrivez ne quittera jamais cet ordinateur.',
+  'download.msg.offline': 'Une seule fois : ensuite, Confi fonctionne même hors ligne.',
+  'download.msg.finishing': 'Presque prêt : préparation de l’IA…',
+  'device.note.mobile': 'Sur cet ordinateur, Confi utilise une IA plus légère. Pour les longs textes, Chrome sur un ordinateur donne les meilleurs résultats.',
+  'device.note.useChrome': 'Astuce : dans Chrome, Confi utilise l’IA intégrée de Chrome, plus rapide et meilleure en rédaction. Toujours 100 % sur cet ordinateur.',
   'translate.toEn': 'Traduire en anglais',
   'translate.toFr': 'Traduire en français',
   'translate.inEn': 'En anglais',
@@ -611,8 +624,11 @@ function initialLang(): Lang {
 export function translate(lang: Lang, key: Key, params?: Record<string, string | number>): string {
   let text = DICTS[lang][key];
   for (const [k, v] of Object.entries(params ?? {})) text = text.replaceAll(`{${k}}`, String(v));
-  return text;
+  return forDevice(text, lang, DEVICE);
 }
+
+/** On phones and tablets, the strings say "this phone" / « ce téléphone » instead of "this computer". */
+const DEVICE = typeof navigator === 'undefined' ? 'computer' : deviceKind();
 
 let current: Lang = initialLang();
 const listeners = new Set<(l: Lang) => void>();

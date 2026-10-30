@@ -8,7 +8,7 @@ import { getDeviceInfo } from '../speedtest/device';
 import { recommendMode } from '../speedtest/recommend';
 import { builtinAvailability, createBuiltinSession } from './builtin';
 import type { CpuMessage, CpuRequest } from './cpu.worker';
-import { cutRepetition } from './quality';
+import { cutRepetition, stripThinking } from './quality';
 
 export type AiStatus =
   | { state: 'idle'; cached: boolean | null }
@@ -330,8 +330,9 @@ class LocalAI {
       const backend = await this.load();
       // Loop guard: if the reply starts repeating itself, stop the model and keep the part before the loop.
       let cut: string | null = null;
-      const guarded = (text: string) => {
+      const guarded = (raw: string) => {
         if (cut !== null) return;
+        const text = stripThinking(raw);
         const checked = cutRepetition(text);
         if (checked.looped) {
           cut = checked.text;
@@ -343,7 +344,7 @@ class LocalAI {
       };
       try {
         const text = await backend.generate(messages, guarded, maxTokens, schema);
-        return cut ?? cutRepetition(text).text;
+        return cut ?? cutRepetition(stripThinking(text)).text;
       } catch (err) {
         if (backend.kind !== 'gpu' || !isGpuLost(err)) throw err;
         // The model on the GPU is gone (its files are still cached). Remember the reset on this computer.
