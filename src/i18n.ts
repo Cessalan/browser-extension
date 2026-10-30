@@ -62,6 +62,7 @@ const en = {
   // Review: compare
   'compare.suggestion': 'Suggestion: {label}',
   'compare.newVersion': 'New version',
+  'compare.copy': 'Copy',
   'compare.use': 'Use this version',
   'compare.clickToEdit': 'Click the suggestion to edit it',
   'compare.showChanges': 'Show changes',
@@ -355,6 +356,7 @@ const fr: Record<Key, string> = {
 
   'compare.suggestion': 'Suggestion : {label}',
   'compare.newVersion': 'Nouvelle version',
+  'compare.copy': 'Copier',
   'compare.use': 'Utiliser cette version',
   'compare.clickToEdit': 'Cliquez sur la suggestion pour la modifier',
   'compare.showChanges': 'Voir les changements',

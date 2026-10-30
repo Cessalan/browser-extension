@@ -281,16 +281,9 @@ export function ReviewEmail() {
     setInstruction('');
   }
 
-  /** Copies rich text (keeps bold, lists… when pasted into Outlook or Gmail) with a plain-text fallback. */
+  /** Copies the text, ready to paste into an email. */
   async function copy() {
-    const html = editor?.getHTML() ?? markdownToHtml(draft);
-    try {
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) }),
-      ]);
-    } catch {
-      await navigator.clipboard.writeText(plain);
-    }
+    await copyRich(editor?.getHTML() ?? markdownToHtml(draft), plain);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -496,6 +489,17 @@ function ProofSummary({ proof, onFixAll }: { proof: ReturnType<typeof useProofre
   );
 }
 
+/** Copies rich text (keeps bold, lists… when pasted into Outlook or Gmail) with a plain-text fallback. */
+async function copyRich(html: string, plain: string) {
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) }),
+    ]);
+  } catch {
+    await navigator.clipboard.writeText(plain);
+  }
+}
+
 function Compare({
   task,
   status,
@@ -511,6 +515,13 @@ function Compare({
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  // Copy the new version straight away, ready to paste, without replacing the text first.
+  async function copyVersion() {
+    await copyRich(markdownToHtml(task.text), markdownToPlain(task.text));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
   // A new suggestion (rewrite or refine) always opens in "show changes" mode.
   useEffect(() => {
     if (!task.done) setEditing(false);
@@ -557,10 +568,14 @@ function Compare({
         {task.done ? (
           <>
             <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
-            <Button key="keep" variant="secondary" onClick={onDiscard} title="Esc">{t('compare.keepMine')}</Button>
-            <span class="text-xs text-muted">{editing && parts ? (
-              <button type="button" class="underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
-            ) : t('compare.clickToEdit')}</span>
+            <Button key="copy" variant="secondary" onClick={() => void copyVersion()} icon={copied ? Check : Copy}>
+              {copied ? t('editor.copied') : t('compare.copy')}
+            </Button>
+            <Button key="keep" variant="ghost" onClick={onDiscard} title="Esc">{t('compare.keepMine')}</Button>
+            {/* "Click to edit" is the new version's tooltip; the footer stays on one line. */}
+            {editing && parts && (
+              <button type="button" class="text-xs text-muted underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
+            )}
             {changes && (
               <span class="ml-auto text-xs text-muted">
                 <span class="text-brand">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
