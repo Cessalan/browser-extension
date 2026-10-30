@@ -1,6 +1,8 @@
 import type { Message } from '../ai/engine';
 import { lockDetails, unlockDetails } from '../ai/mask';
 import { cleanRewrite, type TextLang } from './prompts';
+import { getStyle } from '../style/store';
+import { styleInstructions } from '../style/style';
 
 /**
  * The assistant chat: the person says what they want ("warmer", "put the request first"), the AI
@@ -48,7 +50,12 @@ export function chatMessages(
   return {
     locked,
     messages: [
-      { role: 'system', content: SYSTEM.replace('{lang}', LANG_NAME[lang]).replace('{replyLang}', LANG_NAME[replyLang]) },
+      {
+        role: 'system',
+        content: [SYSTEM.replace('{lang}', LANG_NAME[lang]).replace('{replyLang}', LANG_NAME[replyLang]), styleInstructions(getStyle(), text, lang, 4, 600)]
+          .filter(Boolean)
+          .join('\n\n'),
+      },
       ...history.map((t) => ({ role: t.role, content: t.content }) as Message),
       { role: 'user', content: `<text>\n${lockedText}\n</text>\n\n${request.trim()}` },
     ],
@@ -113,4 +120,27 @@ export function splitReply(raw: string, originalWords = 0): { say: string; text:
 export function unlockProposal(text: string, locked: Map<string, string>): string | null {
   const { text: out, missing } = unlockDetails(text, locked);
   return missing.length ? null : out;
+}
+
+const contentWords = (t: string) => t.toLowerCase().match(/\p{L}{4,}/gu) ?? [];
+// How a message to the person starts, as opposed to a new version of their text.
+const MESSAGE_START = /^\s*(?:j['’]ai\b|je (?:vais|viens|peux|propose|vous)\b|voici\b|voilà\b|d['’]accord\b|bien sûr\b|parfait\b|here\b|i['’]ve\b|i have\b|i made\b|i changed\b|i rewrote\b|sure\b|okay\b|ok,)/i;
+
+/**
+ * True when what came back as "the new version" is really a message to the person ("I made it warmer…"):
+ * it starts like one and is much shorter than the text, or it has almost nothing in common with the text
+ * and is much shorter. It then goes to the chat, never next to the text. (A translation is as long as
+ * the text, so it isn't mistaken for a message.)
+ */
+export function looksLikeMessage(proposal: string, base: string): boolean {
+  const p = proposal.trim();
+  const pWords = p.split(/\s+/).length;
+  const bWords = base.trim().split(/\s+/).length;
+  if (MESSAGE_START.test(p) && pWords < bWords * 0.6) return true;
+  const baseWords = new Set(contentWords(base));
+  if (baseWords.size < 6) return false;
+  const mine = new Set(contentWords(p));
+  let shared = 0;
+  for (const w of baseWords) if (mine.has(w)) shared++;
+  return shared / baseWords.size < 0.15 && pWords < bWords * 0.5;
 }

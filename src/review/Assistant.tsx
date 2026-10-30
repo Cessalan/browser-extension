@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { ArrowUp, Info, MessageSquarePlus, Sparkles } from 'lucide-preact';
+import { ArrowUp, Info, MessageSquarePlus, Sparkles, Square } from 'lucide-preact';
 import { ShimmerText, Skeleton } from '../ui';
 import { useI18n, type Key } from '../i18n';
 
@@ -18,6 +18,7 @@ export function Assistant({
   disabled,
   status,
   onSend,
+  onStop,
   onReset,
 }: {
   entries: ChatEntry[];
@@ -26,6 +27,8 @@ export function Assistant({
   disabled: boolean;
   status?: ComponentChildren;
   onSend: (message: string) => void;
+  /** Stops the answer being written. */
+  onStop: () => void;
   onReset: () => void;
 }) {
   const { t } = useI18n();
@@ -36,8 +39,9 @@ export function Assistant({
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: 'smooth' });
   }, [entries.length, busy?.say]);
 
+  // Sending while an answer is being written stops that one and starts fresh (the screen handles it).
   function send(text: string) {
-    if (!text.trim() || busy || disabled) return;
+    if (!text.trim() || disabled) return;
     onSend(text.trim());
     setInput('');
   }
@@ -54,7 +58,6 @@ export function Assistant({
               type="button"
               class="rounded-md p-1.5 text-muted hover:bg-canvas hover:text-ink disabled:opacity-40"
               onClick={onReset}
-              disabled={!!busy}
               title={t('chat.new')}
               aria-label={t('chat.new')}
             >
@@ -116,14 +119,27 @@ export function Assistant({
             }}
             disabled={disabled}
           />
-          <button
-            type="submit"
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:brightness-110 disabled:opacity-40"
-            disabled={!input.trim() || !!busy || disabled}
-            aria-label={t('chat.send')}
-          >
-            <ArrowUp size={16} />
-          </button>
+          {busy && !input.trim() ? (
+            // While an answer is being written: stop it (typing a new request turns this back into Send).
+            <button
+              type="button"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-ink text-white hover:bg-ink/80"
+              onClick={onStop}
+              aria-label={t('compare.stop')}
+              title={t('compare.stop')}
+            >
+              <Square size={13} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:brightness-110 disabled:opacity-40"
+              disabled={!input.trim() || disabled}
+              aria-label={t('chat.send')}
+            >
+              <ArrowUp size={16} />
+            </button>
+          )}
         </div>
         <p class="mt-2 text-[11px] text-muted">{t('chat.private')}</p>
       </form>

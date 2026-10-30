@@ -17,7 +17,9 @@ import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
 import { translateText } from '../ai/translate';
 import { Assistant, type ChatEntry } from './Assistant';
 import { VersionsMenu, type Version } from './Versions';
-import { CHAT_SCHEMA, chatMessages, splitReply, unlockProposal, type ChatTurn } from './chat';
+import { StyleOffer } from '../style/StyleOffer';
+import { getStyle } from '../style/store';
+import { CHAT_SCHEMA, chatMessages, looksLikeMessage, splitReply, unlockProposal, type ChatTurn } from './chat';
 import { unlockDetails } from '../ai/mask';
 
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
@@ -168,14 +170,30 @@ export function ReviewEmail() {
     setEditorContent(next);
   }
 
+  // Every AI request gets a number. Starting a new one (or stopping) moves the number on, so a request
+  // that's still finishing in the background can never write over what's on screen.
+  const job = useRef(0);
+
+  /** Stops whatever the AI is writing (toolbar rewrite or assistant), so a new request starts fresh. */
+  async function stopCurrent() {
+    job.current++;
+    setChatBusy(null);
+    setTask((cur) => (cur && !cur.done ? null : cur));
+    await ai.stop();
+  }
+
   async function run(next: Task, exec: Exec) {
+    if (running || chatBusy) await stopCurrent();
+    const id = ++job.current;
     setError(null);
     lastRun.current = { next, exec };
     setTask(next);
     try {
-      const text = await exec((t) => setTask((cur) => cur && { ...cur, text: t }));
+      const text = await exec((t) => id === job.current && setTask((cur) => cur && { ...cur, text: t }));
+      if (id !== job.current) return;
       setTask((cur) => cur && { ...cur, text, done: true });
     } catch (err) {
+      if (id !== job.current) return; // replaced or stopped: not an error for the person
       setTask(null);
       if (err instanceof GpuLostError) setError({ text: '', gpuLost: true });
       // The model ignored the text or dropped a protected detail (it happens with the smallest modes).
@@ -191,7 +209,7 @@ export function ReviewEmail() {
   }
 
   function review() {
-    if (!plain.trim() || running) return;
+    if (!plain.trim()) return;
     void run({ kind: 'review', text: '', done: false, forDraft: draft, startedAt: Date.now() }, (onText) =>
       ai.generate(reviewMessages(plain, lang), onText, 300),
     );
@@ -212,7 +230,6 @@ export function ReviewEmail() {
   const [chatLog, setChatLog] = useState<ChatEntry[]>([]);
   const [chatBusy, setChatBusy] = useState<{ say: string; writing: boolean } | null>(null);
   const chatHistory = useRef<ChatTurn[]>([]);
-  const chatRun = useRef(0);
   // The assistant speaks the browser's language; it switches only if the person writes to it in another one.
   const chatLang = useRef<TextLang>(lang);
   useEffect(() => {
@@ -221,7 +238,8 @@ export function ReviewEmail() {
 
   /** Sends a request to the assistant. A proposed version opens side by side; the text itself never changes on its own. */
   async function sendChat(request: string) {
-    const run = ++chatRun.current;
+    if (running || chatBusy) await stopCurrent();
+    const run = ++job.current;
     // With a suggestion on screen, the request applies to that suggestion (diffed against the original text).
     const current = task?.kind === 'rewrite' && task.done ? task : null;
     const base = current?.text ?? draft;
@@ -241,30 +259,37 @@ export function ReviewEmail() {
       const raw = await ai.generate(
         messages,
         (soFar) => {
-          if (run !== chatRun.current) return;
+          if (run !== job.current) return;
           const r = splitReply(soFar, words);
           setChatBusy({ say: r.say, writing: r.writing });
-          if (r.text) setTask(proposal(unlockDetails(r.text, locked).text, false));
+          // Only a real new version goes next to the text; a message to the person stays in the chat.
+          if (r.text && !looksLikeMessage(markdownToPlain(r.text), markdownToPlain(base))) setTask(proposal(unlockDetails(r.text, locked).text, false));
         },
         Math.min(2000, words * 3 + 200),
         CHAT_SCHEMA,
       );
-      if (run !== chatRun.current) return;
-      const r = splitReply(raw, words);
+      if (run !== job.current) return;
+      const reply = splitReply(raw, words);
+      // The AI wrote its message where the new version goes: show it in the chat and keep the text as it was.
+      const misplaced = !!reply.text && looksLikeMessage(markdownToPlain(reply.text), markdownToPlain(base));
+      const r = misplaced ? { ...reply, say: [reply.say, reply.text].filter(Boolean).join(' '), text: null } : reply;
+      if (misplaced) setTask(current);
       const text = r.text && unlockProposal(r.text, locked);
       if (text) setTask(proposal(text, true));
       else if (r.text) setTask(current); // the AI dropped a protected detail: keep what was there
       chatHistory.current = [...chatHistory.current, { role: 'user' as const, content: request }, { role: 'assistant' as const, content: r.say || '…' }].slice(-12);
       setChatLog((l) => [...l, { role: 'assistant', say: r.say, proposal: text ? 'shown' : r.text ? 'setAside' : undefined }]);
     } catch {
-      if (run === chatRun.current) setChatLog((l) => [...l, { role: 'assistant', say: '', failed: true }]);
+      if (run === job.current) setChatLog((l) => [...l, { role: 'assistant', say: '', failed: true }]);
     } finally {
-      if (run === chatRun.current) setChatBusy(null);
+      if (run === job.current) setChatBusy(null);
     }
   }
 
   function resetChat() {
-    chatRun.current++;
+    job.current++;
+    void ai.stop();
+    setTask((cur) => (cur && !cur.done ? null : cur));
     chatHistory.current = [];
     chatLang.current = lang;
     setChatLog([]);
@@ -273,11 +298,7 @@ export function ReviewEmail() {
 
   /** Closes the suggestion (and stops the assistant if it was still writing it). */
   function discard() {
-    if (chatBusy) {
-      chatRun.current++;
-      setChatBusy(null);
-      void ai.stop();
-    }
+    if (chatBusy || running) void stopCurrent();
     setTask(null);
   }
 
@@ -313,7 +334,7 @@ export function ReviewEmail() {
 
   function applyInstruction() {
     const text = instruction.trim();
-    if (!text || running) return;
+    if (!text) return;
     if (task?.kind === 'rewrite' && task.done) {
       // Keep diffing against the user's original email.
       rewrite(quote(text, lang), task.original, { instruction: text }, task.text, task.translated);
@@ -325,14 +346,26 @@ export function ReviewEmail() {
     setInstruction('');
   }
 
+  // After copying (the email is done), offer to keep it as an example of the person's style.
+  const [styleOffer, setStyleOffer] = useState<string | null>(null);
+  const styleDeclined = useRef(false);
+  function offerStyle(text: string) {
+    const s = getStyle();
+    // Not when it's too short, already saved, or the person said no to learning their style this visit.
+    if (text.trim().split(/\s+/).length < 8 || (!s.enabled && (s.examples.length > 0 || styleDeclined.current))) return;
+    setStyleOffer(text);
+  }
+
   /** Copies the text, ready to paste into an email. */
   async function copy() {
     await copyRich(editor?.getHTML() ?? markdownToHtml(draft), plain);
+    offerStyle(plain);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const canAct = plain.trim().length > 0 && !running;
+  // Buttons stay available while the AI writes: a new request stops the current one and starts fresh.
+  const canAct = plain.trim().length > 0;
 
   return (
     <div class="space-y-4">
@@ -369,7 +402,7 @@ export function ReviewEmail() {
             onSubmit={applyInstruction}
             placeholder={refining ? t('compare.refine') : t('custom.placeholder')}
             button={t('custom.apply')}
-            disabled={running || (!refining && !plain.trim())}
+            disabled={!refining && !plain.trim()}
           />
         )}
       </div>
@@ -379,8 +412,9 @@ export function ReviewEmail() {
         <Assistant
           entries={chatLog}
           busy={chatBusy}
-          disabled={!plain.trim() || running}
+          disabled={!plain.trim()}
           onSend={(m) => void sendChat(m)}
+          onStop={() => void stopCurrent()}
           onReset={resetChat}
         />
       )}
@@ -438,6 +472,7 @@ export function ReviewEmail() {
           status={status}
           onChange={(text) => setTask({ ...task, text })}
           onUse={() => { replaceDraft(task.text, task.label); setTask(null); }}
+          onCopied={(text) => offerStyle(markdownToPlain(text))}
           onDiscard={discard}
         />
       ) : (
@@ -498,6 +533,7 @@ export function ReviewEmail() {
       )}
       </div>
       </div>
+      {styleOffer && <StyleOffer text={styleOffer} onDone={() => setStyleOffer(null)} onDecline={() => (styleDeclined.current = true)} />}
     </div>
   );
 }
@@ -559,12 +595,14 @@ function Compare({
   onChange,
   onUse,
   onDiscard,
+  onCopied,
 }: {
   task: Rewrite;
   status: AiStatus;
   onChange: (text: string) => void;
   onUse: () => void;
   onDiscard: () => void;
+  onCopied: (text: string) => void;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
@@ -572,6 +610,7 @@ function Compare({
   // Copy the new version straight away, ready to paste, without replacing the text first.
   async function copyVersion() {
     await copyRich(markdownToHtml(task.text), markdownToPlain(task.text));
+    onCopied(task.text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }

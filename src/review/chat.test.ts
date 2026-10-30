@@ -46,3 +46,19 @@ describe('assistant chat', () => {
     expect(unlockProposal('Dossier prêt.', locked)).toBeNull();
   });
 });
+
+describe('looksLikeMessage', () => {
+  const base = 'Bonjour Dre Tremblay, le patient est prêt pour le congé vers la réadaptation vendredi. Pouvez-vous confirmer que les ordonnances sont signées? Merci, Jordan';
+  it('spots a message to the person written where the new version goes', async () => {
+    const { looksLikeMessage } = await import('./chat');
+    expect(looksLikeMessage('J’ai rendu le ton plus chaleureux et ajouté une formule de politesse.', base)).toBe(true);
+    expect(looksLikeMessage('I made it warmer.', base)).toBe(true);
+    expect(looksLikeMessage('Quelle date voulez-vous indiquer?', base)).toBe(true); // nothing in common, short
+  });
+  it('keeps real new versions, including short or translated ones', async () => {
+    const { looksLikeMessage } = await import('./chat');
+    expect(looksLikeMessage('Bonjour Docteure Tremblay, le patient pourra aller en réadaptation vendredi. Pourriez-vous confirmer les ordonnances? Merci, Jordan', base)).toBe(false);
+    expect(looksLikeMessage('Le patient est prêt pour vendredi; ordonnances signées?', base)).toBe(false); // much shorter, same subject
+    expect(looksLikeMessage('Hello Dr. Tremblay, the patient is ready for discharge to rehabilitation on Friday. Could you confirm the prescriptions are signed? Thanks, Jordan', base)).toBe(false);
+  });
+});

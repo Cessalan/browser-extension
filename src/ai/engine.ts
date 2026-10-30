@@ -149,15 +149,21 @@ async function startCpu(modelId: string, onProgress: Progress): Promise<Backend>
 async function startBuiltin(onProgress: Progress): Promise<Backend> {
   // Starting a first session makes Chrome download its model if needed (with progress).
   await createBuiltinSession([], (f) => onProgress(f, '')).then((s) => s.destroy());
-  let abort = new AbortController();
+  // Several requests can run at once (a rewrite and the name finder): Stop must reach all of them.
+  const running = new Set<AbortController>();
+  const stopAll = () => running.forEach((c) => c.abort());
   const backend: Backend = {
     kind: 'builtin',
     async generate(messages, onText, _maxTokens, schema) {
-      abort = new AbortController();
+      const abort = new AbortController();
+      running.add(abort);
       const signal = abort.signal;
       const turns = messages.map((m) => ({ role: m.role as 'system' | 'user' | 'assistant', content: String(m.content) }));
       const last = turns.pop()!;
-      const session = await createBuiltinSession(turns, undefined, signal);
+      const session = await createBuiltinSession(turns, undefined, signal).catch((err) => {
+        running.delete(abort);
+        throw err;
+      });
       let text = '';
       try {
         // Chrome streams new pieces of the reply, not the whole reply so far.
@@ -175,11 +181,12 @@ async function startBuiltin(onProgress: Progress): Promise<Backend> {
         throw err;
       } finally {
         session.destroy();
+        running.delete(abort);
       }
       return text;
     },
-    stop: () => abort.abort(),
-    unload: async () => abort.abort(),
+    stop: stopAll,
+    unload: async () => stopAll(),
   };
   return backend;
 }
@@ -384,6 +391,9 @@ class LocalAI {
 
 export const ai = new LocalAI();
 
+// Leaving or reloading the page stops the AI: Chrome's built-in AI would otherwise keep writing a reply nobody will see.
+if (typeof addEventListener === 'function') addEventListener('pagehide', () => void ai.stop());
+
 export function useAiStatus(): AiStatus {
   const [status, setStatus] = useState(ai.status);
   useEffect(() => {
@@ -449,6 +459,10 @@ async function mockGenerate(messages: Message[], onText: (text: string) => void)
     const sayFr = system.includes('Write "say" in French');
     const politer = draft.replace(/^(Bonjour|Hi)([^\n]*)/, fr ? 'Bonjour$2' : 'Hello$2').replace(/\n\n(merci|thx)\b/i, fr ? '\n\nMerci beaucoup et bonne journée,' : '\n\nThank you very much,');
     let text = '';
+    // `/?mockai=misplaced`: the AI writes its message where the new version goes (Confi must keep it in the chat).
+    if (new URLSearchParams(location.search).get('mockai') === 'misplaced') {
+      return JSON.stringify({ say: '', text: sayFr ? 'J’ai rendu le ton plus poli et ajouté une formule de politesse.' : 'I made the tone more polite.' });
+    }
     // Same shape as Chrome's AI with a JSON schema.
     const reply = JSON.stringify({ say: sayFr ? 'J’ai rendu le ton plus poli et ajouté une formule de politesse.' : 'I made the tone more polite and added a closing line.', text: politer });
     for (const word of reply.split(/(?<=\s)/)) {

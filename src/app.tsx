@@ -4,7 +4,8 @@ import { SpeedTest } from './speedtest/SpeedTest';
 import { Landing } from './landing/Landing';
 import { Bench } from './bench/Bench';
 import { setLang, useI18n } from './i18n';
-import { ArrowLeft, Languages, RefreshCw, Settings2 } from 'lucide-preact';
+import { ArrowLeft, Languages, PenLine, RefreshCw, Settings2 } from 'lucide-preact';
+import { StylePanel } from './style/StylePanel';
 import { useRegisterSW } from 'virtual:pwa-register/preact';
 
 // The email screen is home; Setup is reached from the gear button. (Notes will join home as a tab.)
@@ -40,6 +41,7 @@ function useHash() {
 
 export function App() {
   const hash = useHash();
+  const [styleOpen, setStyleOpen] = useState(false);
   const { lang, t } = useI18n();
   const page = PAGES[hash];
   const onSetup = page === SpeedTest || page === Bench;
@@ -69,6 +71,13 @@ export function App() {
             <button
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-muted hover:bg-canvas hover:text-ink"
+              onClick={() => setStyleOpen(true)}
+            >
+              <PenLine size={16} aria-hidden="true" /> <span class="hidden sm:inline">{t('style.button')}</span>
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-muted hover:bg-canvas hover:text-ink"
               onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
               lang={lang === 'fr' ? 'en' : 'fr'}
             >
@@ -86,6 +95,7 @@ export function App() {
           </div>
         </div>
       </header>
+      {styleOpen && <StylePanel onClose={() => setStyleOpen(false)} />}
       <UpdateBanner />
       <main class="mx-auto max-w-6xl px-4 py-6">
         {onSetup && (

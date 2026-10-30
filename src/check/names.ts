@@ -75,7 +75,18 @@ export async function findNamesWithAi(text: string): Promise<{ text: string; kin
   if (cached) return cached;
   const raw = await ai.generate(namesMessages(text), () => {}, 400, NAMES_SCHEMA);
   const found = verifyNames(raw, text);
+  // A reply cut short (stopped, page closing) isn't valid JSON: don't remember "no names" for this text.
+  if (!isJson(raw)) return found;
   if (cache.size > 50) cache.clear();
   cache.set(text, found);
   return found;
+}
+
+function isJson(raw: string) {
+  try {
+    JSON.parse(raw.replace(/^\s*```(?:json)?|```\s*$/g, ''));
+    return true;
+  } catch {
+    return false;
+  }
 }
