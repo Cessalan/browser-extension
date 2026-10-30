@@ -8,6 +8,7 @@ import { Button, Card, ProgressBar, type Progress } from '../ui';
 import { useI18n, type Key } from '../i18n';
 import { ai } from '../ai/engine';
 import { getDeviceInfo, type DeviceInfo } from './device';
+import { DeviceBadge, DeviceNote } from '../deviceUi';
 import type { LlmResult } from './llm';
 import type { SttResult } from './stt';
 import { modeInfo, resolveModelId, type AiMode, gpuResetCount } from './models';
@@ -318,11 +319,13 @@ function ReadyBanner({
       </div>
       {device && (
         <ul class="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 text-sm text-muted">
+          <DeviceBadge />
           <Fact ok={usableGpu} icon={Monitor}>{t('setup.graphics')}</Fact>
           {device.memoryGB != null && <Fact ok={device.memoryGB >= 8} icon={MemoryStick}>{t('setup.memory', { gb: device.memoryGB })}</Fact>}
           {device.storageFreeGB != null && <Fact ok={device.storageFreeGB >= 3} icon={HardDrive}>{t('setup.space', { gb: device.storageFreeGB })}</Fact>}
         </ul>
       )}
+      {device && <DeviceNote builtInAI={device.builtInAI} />}
     </section>
   );
 }

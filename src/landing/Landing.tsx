@@ -9,6 +9,8 @@ import { ai, useAiStatus } from '../ai/engine';
 import { getDeviceInfo, type DeviceInfo } from '../speedtest/device';
 import { modeInfo, type AiMode, gpuResetCount } from '../speedtest/models';
 import { isSoftwareGpu, modesFor, recommendMode, shownModeFor } from '../speedtest/recommend';
+import { DownloadProgress } from '../download';
+import { DeviceBadge, DeviceNote } from '../deviceUi';
 
 const MODE_ICONS: Record<AiMode, LucideIcon> = { chrome: Globe, compat: Cpu, fast: Zap, standard: Star, smart: Brain };
 const logo = `${import.meta.env.BASE_URL}icon.svg`;
@@ -294,11 +296,13 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
         ) : (
           <>
             <ul class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+              <DeviceBadge />
               <Check ok={usableGpu} icon={Monitor}>{t('setup.graphics')}</Check>
               {device.memoryGB != null && <Check ok={device.memoryGB >= 8} icon={MemoryStick}>{t('setup.memory', { gb: device.memoryGB })}</Check>}
               {device.storageFreeGB != null && <Check ok={!lowSpace} icon={HardDrive}>{t('setup.space', { gb: device.storageFreeGB })}</Check>}
             </ul>
             {!usableGpu && shownMode !== 'chrome' && <p class="mt-3 text-sm text-muted">{t('land.start.noGpu')}</p>}
+            <DeviceNote builtInAI={device.builtInAI} />
           </>
         )}
       </div>
@@ -354,14 +358,8 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
             </div>
           ) : status.state === 'loading' ? (
             <div>
-              <div class="flex justify-between text-sm">
-                <span class="font-medium">{t('setup.downloading', { pct: Math.round(status.fraction * 100) })}</span>
-                <span class="text-muted">{byChrome ? t('setup.byChrome') : `~${size} ${t('setup.mb')}`}</span>
-              </div>
-              <div class="mt-2 h-2 overflow-hidden rounded-full bg-brand-soft">
-                <div class="progress-shine h-full rounded-full bg-brand transition-all" style={{ width: `${Math.round(status.fraction * 100)}%` }} />
-              </div>
-              <p class="mt-2 text-sm text-muted">{t(byChrome ? 'land.start.chromeHint' : 'land.start.downloadingHint')}</p>
+              <DownloadProgress fraction={status.fraction} sizeMB={size} byChrome={byChrome} />
+              <p class="mt-3 text-xs text-muted">{t(byChrome ? 'land.start.chromeHint' : 'land.start.downloadingHint')}</p>
             </div>
           ) : (
             <div class="flex flex-wrap items-center gap-4">

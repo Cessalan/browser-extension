@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { GpuLostError, ai, useAiStatus, type AiStatus } from '../ai/engine';
 import { Button, ShimmerText, Skeleton } from '../ui';
+import { DownloadProgress } from '../download';
 import { useI18n, type Key, type Lang } from '../i18n';
 import {
   Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb,
@@ -698,11 +699,8 @@ function Streaming({ text, startedAt, status }: { text: string; startedAt: numbe
   const seconds = useElapsed(startedAt);
   if (status.state === 'loading') {
     return (
-      <div class="space-y-2 text-sm">
-        <p>{t('ai.startingLong', { pct: Math.round(status.fraction * 100) })}</p>
-        <div class="h-1.5 overflow-hidden rounded-full bg-brand-soft">
-          <div class="progress-shine h-full rounded-full bg-brand transition-all" style={{ width: `${Math.round(status.fraction * 100)}%` }} />
-        </div>
+      <div class="space-y-3">
+        <DownloadProgress fraction={status.fraction} sizeMB={modeInfo(ai.mode).downloadMB || undefined} byChrome={!!modeInfo(ai.mode).builtin} />
         <p class="text-xs text-muted">{t('ai.firstTimeOnly')}</p>
       </div>
     );
