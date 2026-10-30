@@ -13,6 +13,7 @@ import { IssuePopover, isSureFix, useProofread } from './proofread';
 import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
 import { translateText } from '../ai/translate';
 import { Assistant, type ChatEntry } from './Assistant';
+import { VersionsMenu, type Version } from './Versions';
 import { CHAT_SCHEMA, chatMessages, splitReply, unlockProposal, type ChatTurn } from './chat';
 import { unlockDetails } from '../ai/mask';
 
@@ -84,7 +85,7 @@ export function ReviewEmail() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        replaceDraft(task.text);
+        replaceDraft(task.text, task.label);
         setTask(null);
       } else if (e.key === 'Escape') {
         setTask(null);
@@ -120,8 +121,32 @@ export function ReviewEmail() {
     setDraft(md);
   }
 
-  function replaceDraft(next: string) {
+  // Every version of the text made in this session, so the person can go back to any of them. Memory only.
+  const [versions, setVersions] = useState<Version[]>([]);
+  const versionId = useRef(0);
+  /** Title for the version the next change of `draft` produces (the editor reports new text asynchronously). */
+  const pendingVersion = useRef<string | null>(null);
+
+  /** Adds a version, unless the text is empty or unchanged. Without a title: "Original text", then "Your edits". */
+  function addVersion(text: string, title?: string) {
+    if (!text.trim()) return;
+    setVersions((v) =>
+      v.at(-1)?.text === text
+        ? v
+        : [...v.slice(-49), { id: ++versionId.current, title: title ?? t(v.length ? 'versions.yourEdits' : 'versions.original'), at: Date.now(), text }],
+    );
+  }
+  useEffect(() => {
+    if (pendingVersion.current === null) return;
+    addVersion(draft, pendingVersion.current);
+    pendingVersion.current = null;
+  }, [draft]);
+
+  /** Replaces the text, keeping what was there (typed edits included) as a version first. */
+  function replaceDraft(next: string, title?: string) {
+    addVersion(draft);
     setHistory((h) => [...h.slice(-19), draft]);
+    if (title) pendingVersion.current = title;
     setEditorContent(next);
   }
 
@@ -366,7 +391,7 @@ export function ReviewEmail() {
           task={task}
           status={status}
           onChange={(text) => setTask({ ...task, text })}
-          onUse={() => { replaceDraft(task.text); setTask(null); }}
+          onUse={() => { replaceDraft(task.text, task.label); setTask(null); }}
           onDiscard={discard}
         />
       ) : (
@@ -375,8 +400,18 @@ export function ReviewEmail() {
             <div class="flex items-center gap-2 border-b border-line px-4 py-2">
               <h3 class="whitespace-nowrap font-medium">{t('editor.title')}</h3>
               <span class="whitespace-nowrap text-xs text-muted">{t('editor.words', { n: words })}</span>
-              {plain.trim() && <ProofSummary proof={proof} />}
-              <div class="ml-auto flex gap-1">
+              {plain.trim() && (
+                <ProofSummary
+                  proof={proof}
+                  onFixAll={() => {
+                    addVersion(draft);
+                    pendingVersion.current = t('versions.fixAll');
+                    proof.fixAll();
+                  }}
+                />
+              )}
+              <div class="ml-auto flex items-center gap-1">
+                <VersionsMenu versions={versions} current={draft} editsTitle={t('versions.yourEdits')} onRestore={(v) => replaceDraft(v.text, t('versions.restored', { title: v.title }))} />
                 <Button variant="ghost" onClick={() => { setEditorContent(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
                   {t('editor.undo')}
                 </Button>
@@ -422,7 +457,7 @@ export function ReviewEmail() {
 }
 
 /** "3 suggestions · Fix all", and the AI's progress while it proofreads. */
-function ProofSummary({ proof }: { proof: ReturnType<typeof useProofread> }) {
+function ProofSummary({ proof, onFixAll }: { proof: ReturnType<typeof useProofread>; onFixAll: () => void }) {
   const { t } = useI18n();
   const n = proof.found.length;
   const fixable = proof.found.some((f) => isSureFix(f.issue));
@@ -442,7 +477,7 @@ function ProofSummary({ proof }: { proof: ReturnType<typeof useProofread> }) {
         <>
           <span class="whitespace-nowrap font-medium text-ink">{n === 1 ? t('proof.count1') : t('proof.count', { n })}</span>
           {fixable && (
-            <button type="button" class="whitespace-nowrap font-medium text-brand hover:underline" onClick={proof.fixAll}>
+            <button type="button" class="whitespace-nowrap font-medium text-brand hover:underline" onClick={onFixAll}>
               {t('proof.fixAll')}
             </button>
           )}
