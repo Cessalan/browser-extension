@@ -9,7 +9,8 @@ import {
 } from 'lucide-preact';
 import { findSensitive, forgetDetail, learnDetails, type SensitiveMatch } from './sensitive';
 import { findNamesWithAi } from '../check/names';
-import { REWRITES, detectTextLang, parseBullets, reviewMessages, type RewriteId } from './prompts';
+import { REWRITES, clearlyIn, detectTextLang, parseBullets, rememberTextLang, reviewMessages, type RewriteId, type TextLang } from './prompts';
+import { detectLanguage } from '../ai/language';
 import { IssuePopover, isSureFix, useProofread } from './proofread';
 import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
 import { translateText } from '../ai/translate';
@@ -70,6 +71,19 @@ export function ReviewEmail() {
   const sensitive = useMemo(() => findSensitive(plain), [plain, learnedVersion]);
   const running = task !== null && !task.done;
   // Underlines in the editor: spelling, grammar and shorthand, in the text's own language.
+  // The text's language: Chrome's Language Detector when available (refines the quick guess a moment later).
+  const [, langDetected] = useState(0);
+  useEffect(() => {
+    if (!plain.trim()) return;
+    const timer = setTimeout(async () => {
+      const found = await detectLanguage(plain);
+      if (found) {
+        rememberTextLang(plain, found);
+        langDetected((n) => n + 1);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [plain]);
   const textLang = plain.trim() ? detectTextLang(plain) : lang;
   const proof = useProofread(editor, textLang);
   const words = countWords(plain);
@@ -198,6 +212,11 @@ export function ReviewEmail() {
   const [chatBusy, setChatBusy] = useState<{ say: string; writing: boolean } | null>(null);
   const chatHistory = useRef<ChatTurn[]>([]);
   const chatRun = useRef(0);
+  // The assistant speaks the browser's language; it switches only if the person writes to it in another one.
+  const chatLang = useRef<TextLang>(lang);
+  useEffect(() => {
+    if (!chatHistory.current.length) chatLang.current = lang;
+  }, [lang]);
 
   /** Sends a request to the assistant. A proposed version opens side by side; the text itself never changes on its own. */
   async function sendChat(request: string) {
@@ -210,7 +229,9 @@ export function ReviewEmail() {
     setError(null);
     setChatLog((l) => [...l, { role: 'user', say: request }]);
     setChatBusy({ say: '', writing: false });
-    const { messages, locked } = chatMessages(chatHistory.current, request, base, detectTextLang(markdownToPlain(base)) );
+    const asked = request.trim().split(/\s+/).length >= 3 ? ((await detectLanguage(request, 0.8)) ?? clearlyIn(request)) : null;
+    if (asked) chatLang.current = asked;
+    const { messages, locked } = chatMessages(chatHistory.current, request, base, detectTextLang(markdownToPlain(base)), chatLang.current);
     const proposal = (text: string, done: boolean): Task => ({
       kind: 'rewrite', label: quote(request, lang), original, text, done, startedAt, translated: current?.translated,
     });
@@ -244,6 +265,7 @@ export function ReviewEmail() {
   function resetChat() {
     chatRun.current++;
     chatHistory.current = [];
+    chatLang.current = lang;
     setChatLog([]);
     setChatBusy(null);
   }

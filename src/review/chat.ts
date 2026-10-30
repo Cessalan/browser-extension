@@ -18,7 +18,7 @@ const SYSTEM =
   '- "say": one or two short sentences to the person: what you changed, or your question, or your answer. Never put the text itself here.\n' +
   '- "text": the full new version of the text if you changed it; an empty string if you are only asking or answering a question.\n' +
   'Ask a question only if something important is unclear. ' +
-  'Write "say" in the language of the person’s request. Keep the text in its own language ({lang}) unless asked to translate. ' +
+  'Write "say" in {replyLang}. Keep the text in its own language ({lang}) unless asked to translate. ' +
   'Keep markers like [X1] exactly as they are (they hide confidential details). ' +
   'Never invent facts, names, dates or numbers, and never add placeholders like [Name].';
 
@@ -33,12 +33,22 @@ export const CHAT_SCHEMA = {
 const LANG_NAME: Record<TextLang, string> = { fr: 'French', en: 'English' };
 
 /** Messages for the next turn: earlier requests and replies, then the request with the current text (details locked). */
-export function chatMessages(history: ChatTurn[], request: string, text: string, lang: TextLang): { messages: Message[]; locked: Map<string, string> } {
+/**
+ * `lang`: the text's language. `replyLang`: the language the assistant speaks in: the person's browser
+ * language, or the one they switched to in the conversation.
+ */
+export function chatMessages(
+  history: ChatTurn[],
+  request: string,
+  text: string,
+  lang: TextLang,
+  replyLang: TextLang,
+): { messages: Message[]; locked: Map<string, string> } {
   const { text: lockedText, locked } = lockDetails(text);
   return {
     locked,
     messages: [
-      { role: 'system', content: SYSTEM.replace('{lang}', LANG_NAME[lang]) },
+      { role: 'system', content: SYSTEM.replace('{lang}', LANG_NAME[lang]).replace('{replyLang}', LANG_NAME[replyLang]) },
       ...history.map((t) => ({ role: t.role, content: t.content }) as Message),
       { role: 'user', content: `<text>\n${lockedText}\n</text>\n\n${request.trim()}` },
     ],

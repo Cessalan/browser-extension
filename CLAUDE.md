@@ -4,7 +4,8 @@ Confi: a private, local-AI web app (PWA) for anyone who reviews and corrects tex
 This project is unrelated to NurseQuizAI.
 
 - Vite + TypeScript + Preact + Tailwind v4. Design tokens live in `src/index.css` (`@theme`).
-- `src/i18n.ts`: English/French UI strings. French is picked from the browser language; header button switches. Add every new UI string to both dictionaries.
+- `src/i18n.ts`: English/French UI strings. The UI always opens in the browser's language; the header button switches it for the visit only. The assistant also speaks the browser's language and switches only if the person writes to it in another one. Add every new UI string to both dictionaries.
+- Text language (FR/EN): Chrome's Language Detector when available (`src/ai/language.ts`), else common words (`detectTextLang`).
 - `src/landing/`: first-visit landing page (`#/welcome`): value, privacy, guided setup (device check, AI mode, download). Keep claims factual: no compliance badges.
 - `src/ai/engine.ts`: shared on-device text model. When Chrome offers its built-in AI (Gemini Nano, Prompt API, `builtin.ts`), the "Built into Chrome" mode is recommended: far better writing than our small models, still on-device; it falls back to a downloaded model if it fails. GPU modes run WebLLM (WebGPU); "Compatible" mode runs `cpu.worker.ts` (transformers.js on WebAssembly) for computers without usable graphics, and is the automatic fallback if the GPU fails. Dev only: open `/?mockai` for a fake AI.
 - `src/sw.ts`: our service worker (PWA, injectManifest). Besides offline caching it adds COOP/COEP headers so the page is cross-origin isolated (multi-threaded CPU mode); GitHub Pages can't send those headers.

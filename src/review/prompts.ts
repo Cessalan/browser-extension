@@ -12,12 +12,37 @@ export type TextLang = 'en' | 'fr';
 const FR_HINTS = /\b(le|la|les|des|une|est|pour|que|qui|dans|avec|pas|vous|nous|je|il|elle|sur|aux|du|ce|cette|merci|bonjour)\b/gi;
 const EN_HINTS = /\b(the|and|is|are|for|that|with|you|we|this|to|of|in|on|thanks|hi|hello|please)\b/gi;
 
-/** English or French, from common words (accents tip a close call to French). */
+/** Languages Chrome's Language Detector found (src/ai/language.ts), by exact text. */
+const detected = new Map<string, TextLang>();
+/** The language of the whole draft, used for short pieces where common words can't tell. */
+let draftLang: TextLang | null = null;
+
+/** Records what Chrome's detector found for a text; it also becomes the hint for that draft's short pieces. */
+export function rememberTextLang(text: string, lang: TextLang) {
+  if (detected.size > 200) detected.clear();
+  detected.set(text, lang);
+  draftLang = lang;
+}
+
+/**
+ * English or French: Chrome's detector when it has seen this text; otherwise common words, with the
+ * whole draft's language (or accents) deciding a close call.
+ */
 export function detectTextLang(text: string): TextLang {
+  const known = detected.get(text);
+  if (known) return known;
   const fr = text.match(FR_HINTS)?.length ?? 0;
   const en = text.match(EN_HINTS)?.length ?? 0;
+  if (Math.abs(fr - en) <= 1 && draftLang) return draftLang;
   if (fr === en) return /[àâçéèêëîïôûùü]/i.test(text) ? 'fr' : 'en';
   return fr > en ? 'fr' : 'en';
+}
+
+/** True when common words clearly point to one language (used to tell if a chat request switched language). */
+export function clearlyIn(text: string): TextLang | null {
+  const fr = text.match(FR_HINTS)?.length ?? 0;
+  const en = text.match(EN_HINTS)?.length ?? 0;
+  return fr >= en + 2 ? 'fr' : en >= fr + 2 ? 'en' : null;
 }
 
 const RULES: Record<TextLang, { base: string; keep: string; format: string }> = {

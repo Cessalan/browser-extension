@@ -598,19 +598,13 @@ const fr: Record<Key, string> = {
 };
 
 const DICTS: Record<Lang, Record<Key, string>> = { en, fr };
-const STORAGE_KEY = 'lang';
 
 export function detectLang(languages: readonly string[] = navigator.languages ?? [navigator.language]): Lang {
   return languages[0]?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
 }
 
+/** Always the browser's language when Confi opens; the header button switches it for the visit only. */
 function initialLang(): Lang {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'en' || saved === 'fr') return saved;
-  } catch {
-    // Storage blocked: fall back to the browser language.
-  }
   return detectLang();
 }
 
@@ -627,11 +621,6 @@ if (typeof document !== 'undefined') document.documentElement.lang = current;
 export function setLang(lang: Lang) {
   current = lang;
   document.documentElement.lang = lang;
-  try {
-    localStorage.setItem(STORAGE_KEY, lang);
-  } catch {
-    // Not critical: the choice just won't be remembered.
-  }
   listeners.forEach((fn) => fn(lang));
 }
 

@@ -9,9 +9,11 @@ describe('assistant chat', () => {
       'mets la demande en premier',
       'Bonjour, dossier 4482913 prêt. Pouvez-vous signer?',
       'fr',
+      'en',
     );
     expect(messages.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'user']);
-    expect(String(messages[0].content)).toContain('(French)');
+    expect(String(messages[0].content)).toContain('(French)'); // the text stays French…
+    expect(String(messages[0].content)).toContain('Write "say" in English'); // …while the assistant speaks the person's language
     expect(messages[3].content).toBe('<text>\nBonjour, dossier [X1] prêt. Pouvez-vous signer?\n</text>\n\nmets la demande en premier');
     expect(locked.get('[X1]')).toBe('4482913');
   });
