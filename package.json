@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/build-blog.mjs",
     "preview": "vite preview",
     "test": "vitest run"
   },
@@ -20,7 +20,6 @@
     "dictionary-fr": "^3.0.0",
     "harper.js": "^2.13.0",
     "lucide-preact": "^1.61.0",
-    "marked": "^18.1.1",
     "nspell": "^2.1.5",
     "preact": "^11.0.2"
   },
@@ -29,6 +28,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/nspell": "^2.1.6",
     "@webgpu/types": "^0.1.74",
+    "marked": "^18.1.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",

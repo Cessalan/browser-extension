@@ -113,6 +113,7 @@ export function App() {
       <footer class="mx-auto flex max-w-6xl gap-4 px-4 pb-6 text-xs text-muted">
         <span>{t('app.version', { v: __APP_VERSION__ })}</span>
         <a href="#/welcome" class="hover:text-ink">{t('land.about')}</a>
+        <a href={lang === 'fr' ? '/blog/' : '/en/blog/'} class="hover:text-ink">{t('nav.blog')}</a>
       </footer>
       </div>
     </div>

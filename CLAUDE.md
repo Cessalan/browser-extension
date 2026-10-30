@@ -24,6 +24,7 @@ This project is unrelated to NurseQuizAI.
   - `recommend.ts` picks the mode for each computer (specs first, then measured speed). Used until the nurse picks one.
   - Never show model names or jargon in the main UI; technical details stay in the collapsed section.
   - Speech: transformers.js + Moonshine (`stt.ts`).
+- SEO: `index.html` carries the title, description, Open Graph tags and JSON-LD (no compliance claims). The blog is plain HTML generated at build time by `scripts/build-blog.mjs` from `content/blog/*.md` (front matter: title, description, lang, slug, date, optional alternate = slug of the translation): French at `/blog/<slug>/`, English at `/en/blog/<slug>/`, plus `sitemap.xml` and `robots.txt`. The service worker leaves those URLs alone. Articles stay factual and cite sources; no legal advice.
 - No backend. Never add network calls that send user data anywhere. CSP in `index.html` enforces this.
 - Never put real patient data in prompts, tests, or fixtures.
 

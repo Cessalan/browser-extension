@@ -32,7 +32,10 @@ cleanupOutdatedCaches();
 
 // Any page address in scope (e.g. "/?mockai", "/#/setup" reloads) gets the app shell.
 registerRoute(
-  new NavigationRoute(async ({ request }) => isolate((await matchPrecache('index.html')) ?? (await fetch(request)))),
+  new NavigationRoute(async ({ request }) => isolate((await matchPrecache('index.html')) ?? (await fetch(request))), {
+    // The blog is plain pages, not part of the app.
+    denylist: [/^\/blog\//, /^\/en\//, /^\/sitemap\.xml$/, /^\/robots\.txt$/],
+  }),
 );
 
 // The AI and spelling engines (large scripts, WebAssembly, dictionaries) are cached the first time they're used.
