@@ -55,9 +55,29 @@ export function ProgressBar({ progress }: { progress: Progress }) {
   return (
     <div class="mt-3">
       <div class="h-2 overflow-hidden rounded-full bg-brand-soft">
-        <div class="h-full bg-brand transition-all" style={{ width: `${Math.round(progress.fraction * 100)}%` }} />
+        <div class="progress-shine h-full rounded-full bg-brand transition-all" style={{ width: `${Math.round(progress.fraction * 100)}%` }} />
       </div>
       <p class="mt-1 truncate text-xs text-muted">{progress.text}</p>
+    </div>
+  );
+}
+
+/** Text with a light sweeping across it, for "Thinking…", "Writing…" and other waits. */
+export function ShimmerText({ children, class: className = '' }: { children: ComponentChildren; class?: string }) {
+  return <span class={`shimmer-text font-medium ${className}`}>{children}</span>;
+}
+
+const EMAIL_SHAPE = ['w-1/3', '', 'w-full', 'w-11/12', 'w-full', 'w-8/12', '', 'w-10/12', 'w-full', 'w-5/12', '', 'w-1/5', 'w-1/4'];
+
+/**
+ * Placeholder while text is on its way, shimmering. "email" mimics a message (greeting, paragraphs,
+ * sign-off) so the result appears where the eye already is; "lines" is a short list.
+ */
+export function Skeleton({ shape = 'email', lines = 3 }: { shape?: 'email' | 'lines'; lines?: number }) {
+  const rows = shape === 'email' ? EMAIL_SHAPE : Array.from({ length: lines }, (_, i) => ['w-11/12', 'w-9/12', 'w-10/12'][i % 3]);
+  return (
+    <div class="space-y-2.5" aria-hidden="true">
+      {rows.map((w) => (w ? <div class={`shimmer h-3.5 rounded-md ${w}`} /> : <div class="h-2" />))}
     </div>
   );
 }

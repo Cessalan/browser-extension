@@ -359,7 +359,7 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
                 <span class="text-muted">{byChrome ? t('setup.byChrome') : `~${size} ${t('setup.mb')}`}</span>
               </div>
               <div class="mt-2 h-2 overflow-hidden rounded-full bg-brand-soft">
-                <div class="h-full bg-brand transition-all" style={{ width: `${Math.round(status.fraction * 100)}%` }} />
+                <div class="progress-shine h-full rounded-full bg-brand transition-all" style={{ width: `${Math.round(status.fraction * 100)}%` }} />
               </div>
               <p class="mt-2 text-sm text-muted">{t(byChrome ? 'land.start.chromeHint' : 'land.start.downloadingHint')}</p>
             </div>

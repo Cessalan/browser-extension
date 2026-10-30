@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { GpuLostError, ai, useAiStatus, type AiStatus } from '../ai/engine';
-import { Button } from '../ui';
+import { Button, ShimmerText, Skeleton } from '../ui';
 import { useI18n, type Key, type Lang } from '../i18n';
 import {
-  Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
+  Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb,
   Info, Languages, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
@@ -13,7 +13,8 @@ import { IssuePopover, isSureFix, useProofread } from './proofread';
 import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
 import { translateText } from '../ai/translate';
 import { Assistant, type ChatEntry } from './Assistant';
-import { chatMessages, splitReply, unlockProposal, type ChatTurn } from './chat';
+import { VersionsMenu, type Version } from './Versions';
+import { CHAT_SCHEMA, chatMessages, splitReply, unlockProposal, type ChatTurn } from './chat';
 import { unlockDetails } from '../ai/mask';
 
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
@@ -84,7 +85,7 @@ export function ReviewEmail() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        replaceDraft(task.text);
+        replaceDraft(task.text, task.label);
         setTask(null);
       } else if (e.key === 'Escape') {
         setTask(null);
@@ -120,8 +121,32 @@ export function ReviewEmail() {
     setDraft(md);
   }
 
-  function replaceDraft(next: string) {
+  // Every version of the text made in this session, so the person can go back to any of them. Memory only.
+  const [versions, setVersions] = useState<Version[]>([]);
+  const versionId = useRef(0);
+  /** Title for the version the next change of `draft` produces (the editor reports new text asynchronously). */
+  const pendingVersion = useRef<string | null>(null);
+
+  /** Adds a version, unless the text is empty or unchanged. Without a title: "Original text", then "Your edits". */
+  function addVersion(text: string, title?: string) {
+    if (!text.trim()) return;
+    setVersions((v) =>
+      v.at(-1)?.text === text
+        ? v
+        : [...v.slice(-49), { id: ++versionId.current, title: title ?? t(v.length ? 'versions.yourEdits' : 'versions.original'), at: Date.now(), text }],
+    );
+  }
+  useEffect(() => {
+    if (pendingVersion.current === null) return;
+    addVersion(draft, pendingVersion.current);
+    pendingVersion.current = null;
+  }, [draft]);
+
+  /** Replaces the text, keeping what was there (typed edits included) as a version first. */
+  function replaceDraft(next: string, title?: string) {
+    addVersion(draft);
     setHistory((h) => [...h.slice(-19), draft]);
+    if (title) pendingVersion.current = title;
     setEditorContent(next);
   }
 
@@ -192,14 +217,15 @@ export function ReviewEmail() {
         messages,
         (soFar) => {
           if (run !== chatRun.current) return;
-          const r = splitReply(soFar);
+          const r = splitReply(soFar, words);
           setChatBusy({ say: r.say, writing: r.writing });
           if (r.text) setTask(proposal(unlockDetails(r.text, locked).text, false));
         },
         Math.min(2000, words * 3 + 200),
+        CHAT_SCHEMA,
       );
       if (run !== chatRun.current) return;
-      const r = splitReply(raw);
+      const r = splitReply(raw, words);
       const text = r.text && unlockProposal(r.text, locked);
       if (text) setTask(proposal(text, true));
       else if (r.text) setTask(current); // the AI dropped a protected detail: keep what was there
@@ -255,16 +281,9 @@ export function ReviewEmail() {
     setInstruction('');
   }
 
-  /** Copies rich text (keeps bold, lists… when pasted into Outlook or Gmail) with a plain-text fallback. */
+  /** Copies the text, ready to paste into an email. */
   async function copy() {
-    const html = editor?.getHTML() ?? markdownToHtml(draft);
-    try {
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) }),
-      ]);
-    } catch {
-      await navigator.clipboard.writeText(plain);
-    }
+    await copyRich(editor?.getHTML() ?? markdownToHtml(draft), plain);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -365,7 +384,7 @@ export function ReviewEmail() {
           task={task}
           status={status}
           onChange={(text) => setTask({ ...task, text })}
-          onUse={() => { replaceDraft(task.text); setTask(null); }}
+          onUse={() => { replaceDraft(task.text, task.label); setTask(null); }}
           onDiscard={discard}
         />
       ) : (
@@ -374,8 +393,18 @@ export function ReviewEmail() {
             <div class="flex items-center gap-2 border-b border-line px-4 py-2">
               <h3 class="whitespace-nowrap font-medium">{t('editor.title')}</h3>
               <span class="whitespace-nowrap text-xs text-muted">{t('editor.words', { n: words })}</span>
-              {plain.trim() && <ProofSummary proof={proof} />}
-              <div class="ml-auto flex gap-1">
+              {plain.trim() && (
+                <ProofSummary
+                  proof={proof}
+                  onFixAll={() => {
+                    addVersion(draft);
+                    pendingVersion.current = t('versions.fixAll');
+                    proof.fixAll();
+                  }}
+                />
+              )}
+              <div class="ml-auto flex items-center gap-1">
+                <VersionsMenu versions={versions} current={draft} editsTitle={t('versions.yourEdits')} onRestore={(v) => replaceDraft(v.text, t('versions.restored', { title: v.title }))} />
                 <Button variant="ghost" onClick={() => { setEditorContent(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
                   {t('editor.undo')}
                 </Button>
@@ -421,7 +450,7 @@ export function ReviewEmail() {
 }
 
 /** "3 suggestions · Fix all", and the AI's progress while it proofreads. */
-function ProofSummary({ proof }: { proof: ReturnType<typeof useProofread> }) {
+function ProofSummary({ proof, onFixAll }: { proof: ReturnType<typeof useProofread>; onFixAll: () => void }) {
   const { t } = useI18n();
   const n = proof.found.length;
   const fixable = proof.found.some((f) => isSureFix(f.issue));
@@ -430,8 +459,7 @@ function ProofSummary({ proof }: { proof: ReturnType<typeof useProofread> }) {
       <span class="h-3 w-px bg-line" aria-hidden="true" />
       {proof.ai ? (
         <>
-          <LoaderCircle size={13} class="animate-spin text-brand" aria-hidden="true" />
-          <span class="whitespace-nowrap text-muted">{t('proof.aiRunning', { done: proof.ai.done, total: proof.ai.total })}</span>
+          <ShimmerText class="whitespace-nowrap">{t('proof.aiRunning', { done: proof.ai.done, total: proof.ai.total })}</ShimmerText>
           <button type="button" class="text-muted underline hover:text-ink" onClick={proof.stopAi}>{t('proof.stop')}</button>
         </>
       ) : n === 0 ? (
@@ -442,7 +470,7 @@ function ProofSummary({ proof }: { proof: ReturnType<typeof useProofread> }) {
         <>
           <span class="whitespace-nowrap font-medium text-ink">{n === 1 ? t('proof.count1') : t('proof.count', { n })}</span>
           {fixable && (
-            <button type="button" class="whitespace-nowrap font-medium text-brand hover:underline" onClick={proof.fixAll}>
+            <button type="button" class="whitespace-nowrap font-medium text-brand hover:underline" onClick={onFixAll}>
               {t('proof.fixAll')}
             </button>
           )}
@@ -461,6 +489,17 @@ function ProofSummary({ proof }: { proof: ReturnType<typeof useProofread> }) {
   );
 }
 
+/** Copies rich text (keeps bold, lists… when pasted into Outlook or Gmail) with a plain-text fallback. */
+async function copyRich(html: string, plain: string) {
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) }),
+    ]);
+  } catch {
+    await navigator.clipboard.writeText(plain);
+  }
+}
+
 function Compare({
   task,
   status,
@@ -476,6 +515,13 @@ function Compare({
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  // Copy the new version straight away, ready to paste, without replacing the text first.
+  async function copyVersion() {
+    await copyRich(markdownToHtml(task.text), markdownToPlain(task.text));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
   // A new suggestion (rewrite or refine) always opens in "show changes" mode.
   useEffect(() => {
     if (!task.done) setEditing(false);
@@ -490,19 +536,28 @@ function Compare({
     <section class="rounded-xl border border-line bg-surface shadow-card">
       <div class="grid md:grid-cols-2">
         <div class="border-b border-line md:border-b-0 md:border-r">
-          <PaneHeader title={t('editor.title')} hint={parts ? t('compare.removed') : undefined} />
+          <PaneHeader title={t('editor.title')} />
           <div class="whitespace-pre-wrap p-4 text-[15px] leading-relaxed">
             {parts ? <DiffText parts={parts} side="before" /> : markdownToPlain(task.original)}
           </div>
         </div>
         <div class="bg-brand-soft/30">
           <PaneHeader
-            title={t('compare.suggestion', { label: task.label })}
-            hint={parts && !editing ? t('compare.added') : undefined}
+            title={t('compare.newVersion')}
             action={
-              <button type="button" class="rounded-md p-1 text-muted hover:bg-white hover:text-ink" onClick={onDiscard} title={`${t('compare.keepMine')} (Esc)`} aria-label={t('compare.keepMine')}>
-                <X size={16} />
-              </button>
+              task.done && (
+                // Where people look to copy: the corner of the text itself.
+                <button
+                  type="button"
+                  class={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    copied ? 'border-green-200 bg-green-50 text-good' : 'border-line bg-surface text-ink shadow-sm hover:border-brand/40 hover:text-brand'
+                  }`}
+                  onClick={() => void copyVersion()}
+                >
+                  {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+                  {copied ? t('editor.copied') : t('compare.copy')}
+                </button>
+              )
             }
           />
           {editing ? (
@@ -530,9 +585,10 @@ function Compare({
         {task.done ? (
           <>
             <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
-            <span class="text-xs text-muted">{editing && parts ? (
-              <button type="button" class="underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
-            ) : t('compare.clickToEdit')}</span>
+            {/* "Click to edit" is the new version's tooltip; the footer stays on one line. */}
+            {editing && parts && (
+              <button type="button" class="text-xs text-muted underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
+            )}
             {changes && (
               <span class="ml-auto text-xs text-muted">
                 <span class="text-brand">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
@@ -593,7 +649,7 @@ function Streaming({ text, startedAt, status }: { text: string; startedAt: numbe
       <div class="space-y-2 text-sm">
         <p>{t('ai.startingLong', { pct: Math.round(status.fraction * 100) })}</p>
         <div class="h-1.5 overflow-hidden rounded-full bg-brand-soft">
-          <div class="h-full bg-brand transition-all" style={{ width: `${Math.round(status.fraction * 100)}%` }} />
+          <div class="progress-shine h-full rounded-full bg-brand transition-all" style={{ width: `${Math.round(status.fraction * 100)}%` }} />
         </div>
         <p class="text-xs text-muted">{t('ai.firstTimeOnly')}</p>
       </div>
@@ -602,8 +658,8 @@ function Streaming({ text, startedAt, status }: { text: string; startedAt: numbe
   if (!text) {
     return (
       <div>
-        <p class="mb-3 flex items-center gap-2 text-sm text-muted">
-          <Spinner /> {t('compare.writing', { s: seconds })}
+        <p class="mb-4 text-sm">
+          <ShimmerText>{seconds < 5 ? t('compare.writingNow') : t('compare.writing', { s: seconds })}</ShimmerText>
         </p>
         <Skeleton />
       </div>
@@ -612,7 +668,7 @@ function Streaming({ text, startedAt, status }: { text: string; startedAt: numbe
   return (
     <>
       {text}
-      <span class="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-brand align-middle" />
+      <span class="ml-0.5 inline-block h-4 w-[3px] animate-pulse rounded-full bg-brand align-middle" />
     </>
   );
 }
@@ -634,10 +690,10 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
           <Streaming text="" startedAt={task.startedAt} status={status} />
         ) : items.length === 0 && !task.done ? (
           <>
-            <p class="mb-3 flex items-center gap-2 text-sm text-muted">
-              <Spinner /> {t('check.reading', { s: seconds })}
+            <p class="mb-4 text-sm">
+              <ShimmerText>{seconds < 5 ? t('check.readingNow') : t('check.reading', { s: seconds })}</ShimmerText>
             </p>
-            <Skeleton lines={3} />
+            <Skeleton shape="lines" lines={3} />
           </>
         ) : (
           <ul class="space-y-2 text-sm">
@@ -703,7 +759,7 @@ function AiPill({ status }: { status: AiStatus }) {
     case 'loading':
       return (
         <span class={pill}>
-          <Spinner /> {t('ai.starting', { pct: Math.round(status.fraction * 100) })}
+          <ShimmerText>{t('ai.starting', { pct: Math.round(status.fraction * 100) })}</ShimmerText>
         </span>
       );
     case 'error':
@@ -791,21 +847,6 @@ function countWords(text: string) {
 function quote(instruction: string, lang: Lang) {
   const short = instruction.length > 40 ? instruction.slice(0, 40) + '…' : instruction;
   return lang === 'fr' ? `« ${short} »` : `“${short}”`;
-}
-
-function Spinner() {
-  return <LoaderCircle size={15} class="animate-spin text-brand" aria-hidden="true" />;
-}
-
-function Skeleton({ lines = 6 }: { lines?: number }) {
-  const widths = ['w-11/12', 'w-full', 'w-10/12', 'w-9/12', 'w-full', 'w-7/12'];
-  return (
-    <div class="animate-pulse space-y-2.5">
-      {Array.from({ length: lines }, (_, i) => (
-        <div class={`h-3 rounded bg-line ${widths[i % widths.length]}`} />
-      ))}
-    </div>
-  );
 }
 
 function useElapsed(since: number) {

@@ -9,7 +9,7 @@ type Langs = { type: 'text'; languages: string[] }[];
 type Options = { expectedInputs: Langs; expectedOutputs: Langs };
 
 export interface BuiltinSession {
-  promptStreaming(input: string, options?: { signal?: AbortSignal }): AsyncIterable<string>;
+  promptStreaming(input: string, options?: { signal?: AbortSignal; responseConstraint?: object }): AsyncIterable<string>;
   destroy(): void;
 }
 
