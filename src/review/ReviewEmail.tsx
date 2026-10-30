@@ -5,7 +5,7 @@ import { Button, ShimmerText, Skeleton } from '../ui';
 import { DownloadProgress } from '../download';
 import { useI18n, type Key, type Lang } from '../i18n';
 import {
-  Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb,
+  Briefcase, Check, ClipboardCheck, Copy, Download, FilePlus, Lightbulb,
   Info, Languages, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, forgetDetail, learnDetails, type SensitiveMatch } from './sensitive';
@@ -99,17 +99,11 @@ export function ReviewEmail() {
     return () => removeEventListener('beforeunload', warn);
   }, [plain.trim().length > 0]);
 
-  // Shortcuts while a suggestion is shown: Ctrl+Enter uses it, Esc keeps the original.
+  // Esc closes a new version and goes back to the text.
   useEffect(() => {
     if (task?.kind !== 'rewrite' || !task.done) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        replaceDraft(task.text, task.label);
-        setTask(null);
-      } else if (e.key === 'Escape') {
-        setTask(null);
-      }
+      if (e.key === 'Escape') setTask(null);
     };
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
@@ -151,7 +145,8 @@ export function ReviewEmail() {
   function addVersion(text: string, title?: string) {
     if (!text.trim()) return;
     setVersions((v) =>
-      v.at(-1)?.text === text
+      // Unchanged, or (for "Your edits") a text already kept: nothing new to keep.
+      v.at(-1)?.text === text || (!title && v.some((x) => x.text === text))
         ? v
         : [...v.slice(-49), { id: ++versionId.current, title: title ?? t(v.length ? 'versions.yourEdits' : 'versions.original'), at: Date.now(), text }],
     );
@@ -320,6 +315,28 @@ export function ReviewEmail() {
     return () => clearTimeout(timer);
   }, [plain, chatOn, status.state]);
 
+  // After "New text", the editor comes back empty: put the cursor in it, ready to paste.
+  const focusEditor = useRef(false);
+  useEffect(() => {
+    if (focusEditor.current && editor) {
+      focusEditor.current = false;
+      // After the editor is back on screen.
+      setTimeout(() => editor.commands.focus('end'), 0);
+    }
+  }, [editor, task]);
+
+  /** Clears everything (the text, a new version, the conversation) so the person can paste a new text. The old text stays in Versions. */
+  function newText() {
+    if (running || chatBusy) void stopCurrent();
+    replaceDraft('');
+    setTask(null);
+    setError(null);
+    resetChat();
+    // The editor is on screen (button above the text) or comes back once the new version closes.
+    if (editor && !task) setTimeout(() => editor.commands.focus('end'), 0);
+    else focusEditor.current = true;
+  }
+
   /** Translates the draft into the other language (French ↔ English). */
   function translate() {
     const to = textLang === 'fr' ? 'en' : 'fr';
@@ -471,8 +488,13 @@ export function ReviewEmail() {
           task={task}
           status={status}
           onChange={(text) => setTask({ ...task, text })}
-          onUse={() => { replaceDraft(task.text, task.label); setTask(null); }}
-          onCopied={(text) => offerStyle(markdownToPlain(text))}
+          onNewText={newText}
+          onCopied={(text) => {
+            // A copied version is one the person kept: it joins the versions, after the text it came from.
+            addVersion(draft);
+            addVersion(text, task.label);
+            offerStyle(markdownToPlain(text));
+          }}
           onDiscard={discard}
         />
       ) : (
@@ -496,8 +518,8 @@ export function ReviewEmail() {
                 <Button variant="ghost" onClick={() => { setEditorContent(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
                   {t('editor.undo')}
                 </Button>
-                <Button variant="ghost" onClick={() => { replaceDraft(''); setTask(null); }} disabled={!draft} icon={Eraser}>
-                  {t('editor.clear')}
+                <Button variant="ghost" onClick={newText} disabled={!draft} icon={FilePlus} title={t('editor.newTextTitle')}>
+                  {t('editor.newText')}
                 </Button>
               </div>
             </div>
@@ -593,14 +615,14 @@ function Compare({
   task,
   status,
   onChange,
-  onUse,
+  onNewText,
   onDiscard,
   onCopied,
 }: {
   task: Rewrite;
   status: AiStatus;
   onChange: (text: string) => void;
-  onUse: () => void;
+  onNewText: () => void;
   onDiscard: () => void;
   onCopied: (text: string) => void;
 }) {
@@ -628,7 +650,17 @@ function Compare({
     <section class="rounded-xl border border-line bg-surface shadow-card">
       <div class="grid md:grid-cols-2">
         <div class="border-b border-line md:border-b-0 md:border-r">
-          <PaneHeader title={t('editor.title')} />
+          <PaneHeader
+            title={t('editor.title')}
+            action={
+              task.done && (
+                // Same place and look as "Copy": each pane's action sits in its own corner.
+                <button type="button" class={CORNER_BUTTON} onClick={onNewText} title={t('editor.newTextTitle')}>
+                  <FilePlus size={15} aria-hidden="true" /> {t('editor.newText')}
+                </button>
+              )
+            }
+          />
           <div class="whitespace-pre-wrap p-4 text-[15px] leading-relaxed">
             {parts ? <DiffText parts={parts} side="before" /> : markdownToPlain(task.original)}
           </div>
@@ -636,14 +668,20 @@ function Compare({
         <div class="bg-brand-soft/30">
           <PaneHeader
             title={t('compare.newVersion')}
+            hint={
+              task.done &&
+              changes && (
+                <>
+                  <span class="text-brand">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
+                </>
+              )
+            }
             action={
               task.done && (
                 // Where people look to copy: the corner of the text itself.
                 <button
                   type="button"
-                  class={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    copied ? 'border-green-200 bg-green-50 text-good' : 'border-line bg-surface text-ink shadow-sm hover:border-brand/40 hover:text-brand'
-                  }`}
+                  class={copied ? `${CORNER_BUTTON} !border-green-200 !bg-green-50 !text-good` : CORNER_BUTTON}
                   onClick={() => void copyVersion()}
                 >
                   {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
@@ -673,20 +711,11 @@ function Compare({
           )}
         </div>
       </div>
+      {/* Done: the actions are in the pane corners; the footer only remains to leave edit mode. */}
+      {(!task.done || (editing && parts)) && (
       <div class="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3">
         {task.done ? (
-          <>
-            <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
-            {/* "Click to edit" is the new version's tooltip; the footer stays on one line. */}
-            {editing && parts && (
-              <button type="button" class="text-xs text-muted underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
-            )}
-            {changes && (
-              <span class="ml-auto text-xs text-muted">
-                <span class="text-brand">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
-              </span>
-            )}
-          </>
+          <button type="button" class="text-xs text-muted underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
         ) : (
           <>
             <Button key="stop" variant="secondary" onClick={() => void ai.stop()} icon={Square}>{t('compare.stop')}</Button>
@@ -694,11 +723,16 @@ function Compare({
           </>
         )}
       </div>
+      )}
     </section>
   );
 }
 
-function PaneHeader({ title, hint, action }: { title: string; hint?: string; action?: ComponentChildren }) {
+/** The action in a pane's top corner ("Copy", "New text"). */
+const CORNER_BUTTON =
+  'inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink shadow-sm transition-colors hover:border-brand/40 hover:text-brand';
+
+function PaneHeader({ title, hint, action }: { title: string; hint?: ComponentChildren; action?: ComponentChildren }) {
   return (
     <div class="flex h-11 items-center gap-2 border-b border-line px-4">
       <h3 class="font-medium">{title}</h3>
