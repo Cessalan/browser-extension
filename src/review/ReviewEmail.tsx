@@ -5,7 +5,7 @@ import { Button, ShimmerText, Skeleton } from '../ui';
 import { DownloadProgress } from '../download';
 import { useI18n, type Key, type Lang } from '../i18n';
 import {
-  Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb,
+  Briefcase, Check, ClipboardCheck, Copy, Download, FilePlus, Lightbulb,
   Info, Languages, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, forgetDetail, learnDetails, type SensitiveMatch } from './sensitive';
@@ -99,17 +99,11 @@ export function ReviewEmail() {
     return () => removeEventListener('beforeunload', warn);
   }, [plain.trim().length > 0]);
 
-  // Shortcuts while a suggestion is shown: Ctrl+Enter uses it, Esc keeps the original.
+  // Esc closes a new version and goes back to the text.
   useEffect(() => {
     if (task?.kind !== 'rewrite' || !task.done) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        replaceDraft(task.text, task.label);
-        setTask(null);
-      } else if (e.key === 'Escape') {
-        setTask(null);
-      }
+      if (e.key === 'Escape') setTask(null);
     };
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
@@ -151,7 +145,8 @@ export function ReviewEmail() {
   function addVersion(text: string, title?: string) {
     if (!text.trim()) return;
     setVersions((v) =>
-      v.at(-1)?.text === text
+      // Unchanged, or (for "Your edits") a text already kept: nothing new to keep.
+      v.at(-1)?.text === text || (!title && v.some((x) => x.text === text))
         ? v
         : [...v.slice(-49), { id: ++versionId.current, title: title ?? t(v.length ? 'versions.yourEdits' : 'versions.original'), at: Date.now(), text }],
     );
@@ -320,6 +315,26 @@ export function ReviewEmail() {
     return () => clearTimeout(timer);
   }, [plain, chatOn, status.state]);
 
+  // After "New text", the editor comes back empty: put the cursor in it, ready to paste.
+  const focusEditor = useRef(false);
+  useEffect(() => {
+    if (focusEditor.current && editor) {
+      focusEditor.current = false;
+      // After the editor is back on screen.
+      setTimeout(() => editor.commands.focus('end'), 0);
+    }
+  }, [editor, task]);
+
+  /** Clears everything (the text, a new version, the conversation) so the person can paste a new text. The old text stays in Versions. */
+  function newText() {
+    if (running || chatBusy) void stopCurrent();
+    replaceDraft('');
+    setTask(null);
+    setError(null);
+    resetChat();
+    focusEditor.current = true;
+  }
+
   /** Translates the draft into the other language (French ↔ English). */
   function translate() {
     const to = textLang === 'fr' ? 'en' : 'fr';
@@ -471,8 +486,13 @@ export function ReviewEmail() {
           task={task}
           status={status}
           onChange={(text) => setTask({ ...task, text })}
-          onUse={() => { replaceDraft(task.text, task.label); setTask(null); }}
-          onCopied={(text) => offerStyle(markdownToPlain(text))}
+          onNewText={newText}
+          onCopied={(text) => {
+            // A copied version is one the person kept: it joins the versions, after the text it came from.
+            addVersion(draft);
+            addVersion(text, task.label);
+            offerStyle(markdownToPlain(text));
+          }}
           onDiscard={discard}
         />
       ) : (
@@ -496,8 +516,8 @@ export function ReviewEmail() {
                 <Button variant="ghost" onClick={() => { setEditorContent(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
                   {t('editor.undo')}
                 </Button>
-                <Button variant="ghost" onClick={() => { replaceDraft(''); setTask(null); }} disabled={!draft} icon={Eraser}>
-                  {t('editor.clear')}
+                <Button variant="ghost" onClick={newText} disabled={!draft} icon={FilePlus} title={t('editor.newTextTitle')}>
+                  {t('editor.newText')}
                 </Button>
               </div>
             </div>
@@ -593,14 +613,14 @@ function Compare({
   task,
   status,
   onChange,
-  onUse,
+  onNewText,
   onDiscard,
   onCopied,
 }: {
   task: Rewrite;
   status: AiStatus;
   onChange: (text: string) => void;
-  onUse: () => void;
+  onNewText: () => void;
   onDiscard: () => void;
   onCopied: (text: string) => void;
 }) {
@@ -676,7 +696,7 @@ function Compare({
       <div class="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3">
         {task.done ? (
           <>
-            <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
+            <Button key="new" variant="secondary" onClick={onNewText} icon={FilePlus} title={t('editor.newTextTitle')}>{t('editor.newText')}</Button>
             {/* "Click to edit" is the new version's tooltip; the footer stays on one line. */}
             {editing && parts && (
               <button type="button" class="text-xs text-muted underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
