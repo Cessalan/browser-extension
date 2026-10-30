@@ -70,11 +70,13 @@ const en = {
   'compare.stop': 'Stop',
   'compare.cancel': 'Cancel',
   'compare.writing': 'Writing… {s}s',
+  'compare.writingNow': 'Writing…',
   'compare.refine': 'Ask for more changes… e.g. "make it warmer"',
 
   // Review: check
   'check.title': 'Check results',
   'check.reading': 'Reading your text… {s}s',
+  'check.readingNow': 'Reading your text…',
   'check.stale': "You've edited the text since this check.",
   'check.close': 'Close',
 
@@ -351,10 +353,12 @@ const fr: Record<Key, string> = {
   'compare.stop': 'Arrêter',
   'compare.cancel': 'Annuler',
   'compare.writing': 'Rédaction… {s} s',
+  'compare.writingNow': 'Rédaction…',
   'compare.refine': "Demander d'autres changements… ex. : « plus chaleureux »",
 
   'check.title': 'Résultats',
   'check.reading': 'Lecture de votre texte… {s} s',
+  'check.readingNow': 'Lecture de votre texte…',
   'check.stale': 'Vous avez modifié le texte depuis cette vérification.',
   'check.close': 'Fermer',
 

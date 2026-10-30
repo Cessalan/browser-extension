@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { ArrowUp, Info, LoaderCircle, MessageSquarePlus, Sparkles } from 'lucide-preact';
+import { ArrowUp, Info, MessageSquarePlus, Sparkles } from 'lucide-preact';
+import { ShimmerText, Skeleton } from '../ui';
 import { useI18n, type Key } from '../i18n';
 
 export type ChatEntry = { role: 'user' | 'assistant'; say: string; proposal?: 'shown' | 'setAside'; failed?: boolean };
@@ -84,9 +85,11 @@ export function Assistant({
           entries.map((e) => <Bubble entry={e} />)
         )}
         {busy && (
-          <div class="flex items-start gap-2 text-ink">
-            <LoaderCircle size={15} class="mt-0.5 shrink-0 animate-spin text-brand" aria-hidden="true" />
-            <span>{busy.say || (busy.writing ? t('chat.writing') : t('chat.thinking'))}</span>
+          <div class="space-y-2">
+            {busy.say ? <p class="whitespace-pre-wrap text-ink">{busy.say}</p> : !busy.writing && <Skeleton shape="lines" lines={2} />}
+            <p>
+              <ShimmerText>{busy.writing ? t('chat.writing') : t('chat.thinking')}</ShimmerText>
+            </p>
           </div>
         )}
       </div>

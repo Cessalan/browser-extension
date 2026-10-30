@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { GpuLostError, ai, useAiStatus, type AiStatus } from '../ai/engine';
-import { Button } from '../ui';
+import { Button, ShimmerText, Skeleton } from '../ui';
 import { useI18n, type Key, type Lang } from '../i18n';
 import {
-  Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
+  Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb,
   Info, Languages, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
@@ -431,8 +431,7 @@ function ProofSummary({ proof }: { proof: ReturnType<typeof useProofread> }) {
       <span class="h-3 w-px bg-line" aria-hidden="true" />
       {proof.ai ? (
         <>
-          <LoaderCircle size={13} class="animate-spin text-brand" aria-hidden="true" />
-          <span class="whitespace-nowrap text-muted">{t('proof.aiRunning', { done: proof.ai.done, total: proof.ai.total })}</span>
+          <ShimmerText class="whitespace-nowrap">{t('proof.aiRunning', { done: proof.ai.done, total: proof.ai.total })}</ShimmerText>
           <button type="button" class="text-muted underline hover:text-ink" onClick={proof.stopAi}>{t('proof.stop')}</button>
         </>
       ) : n === 0 ? (
@@ -587,7 +586,7 @@ function Streaming({ text, startedAt, status }: { text: string; startedAt: numbe
       <div class="space-y-2 text-sm">
         <p>{t('ai.startingLong', { pct: Math.round(status.fraction * 100) })}</p>
         <div class="h-1.5 overflow-hidden rounded-full bg-brand-soft">
-          <div class="h-full bg-brand transition-all" style={{ width: `${Math.round(status.fraction * 100)}%` }} />
+          <div class="progress-shine h-full rounded-full bg-brand transition-all" style={{ width: `${Math.round(status.fraction * 100)}%` }} />
         </div>
         <p class="text-xs text-muted">{t('ai.firstTimeOnly')}</p>
       </div>
@@ -596,8 +595,8 @@ function Streaming({ text, startedAt, status }: { text: string; startedAt: numbe
   if (!text) {
     return (
       <div>
-        <p class="mb-3 flex items-center gap-2 text-sm text-muted">
-          <Spinner /> {t('compare.writing', { s: seconds })}
+        <p class="mb-4 text-sm">
+          <ShimmerText>{seconds < 5 ? t('compare.writingNow') : t('compare.writing', { s: seconds })}</ShimmerText>
         </p>
         <Skeleton />
       </div>
@@ -606,7 +605,7 @@ function Streaming({ text, startedAt, status }: { text: string; startedAt: numbe
   return (
     <>
       {text}
-      <span class="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-brand align-middle" />
+      <span class="ml-0.5 inline-block h-4 w-[3px] animate-pulse rounded-full bg-brand align-middle" />
     </>
   );
 }
@@ -628,10 +627,10 @@ function ReviewPanel({ task, status, stale, onClose }: { task: Review; status: A
           <Streaming text="" startedAt={task.startedAt} status={status} />
         ) : items.length === 0 && !task.done ? (
           <>
-            <p class="mb-3 flex items-center gap-2 text-sm text-muted">
-              <Spinner /> {t('check.reading', { s: seconds })}
+            <p class="mb-4 text-sm">
+              <ShimmerText>{seconds < 5 ? t('check.readingNow') : t('check.reading', { s: seconds })}</ShimmerText>
             </p>
-            <Skeleton lines={3} />
+            <Skeleton shape="lines" lines={3} />
           </>
         ) : (
           <ul class="space-y-2 text-sm">
@@ -697,7 +696,7 @@ function AiPill({ status }: { status: AiStatus }) {
     case 'loading':
       return (
         <span class={pill}>
-          <Spinner /> {t('ai.starting', { pct: Math.round(status.fraction * 100) })}
+          <ShimmerText>{t('ai.starting', { pct: Math.round(status.fraction * 100) })}</ShimmerText>
         </span>
       );
     case 'error':
@@ -785,21 +784,6 @@ function countWords(text: string) {
 function quote(instruction: string, lang: Lang) {
   const short = instruction.length > 40 ? instruction.slice(0, 40) + '…' : instruction;
   return lang === 'fr' ? `« ${short} »` : `“${short}”`;
-}
-
-function Spinner() {
-  return <LoaderCircle size={15} class="animate-spin text-brand" aria-hidden="true" />;
-}
-
-function Skeleton({ lines = 6 }: { lines?: number }) {
-  const widths = ['w-11/12', 'w-full', 'w-10/12', 'w-9/12', 'w-full', 'w-7/12'];
-  return (
-    <div class="animate-pulse space-y-2.5">
-      {Array.from({ length: lines }, (_, i) => (
-        <div class={`h-3 rounded bg-line ${widths[i % widths.length]}`} />
-      ))}
-    </div>
-  );
 }
 
 function useElapsed(since: number) {

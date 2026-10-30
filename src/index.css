@@ -52,3 +52,38 @@ body {
 .confi-dot-spelling { background: #ef4444; }
 .confi-dot-grammar { background: #f59e0b; }
 .confi-dot-shorthand { background: var(--color-brand); }
+
+/* Loading states: a soft light sweeps across placeholders, text and progress bars. */
+@keyframes confi-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+@keyframes confi-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+.shimmer {
+  background: linear-gradient(90deg, #e8f0f8 0%, #e8f0f8 30%, #f7fbff 50%, #e8f0f8 70%, #e8f0f8 100%);
+  background-size: 200% 100%;
+  animation: confi-shimmer 1.6s ease-in-out infinite;
+}
+.shimmer-text {
+  background: linear-gradient(90deg, var(--color-muted) 0%, var(--color-muted) 40%, var(--color-brand) 50%, var(--color-muted) 60%, var(--color-muted) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: confi-shimmer 2s linear infinite;
+}
+.progress-shine { position: relative; overflow: hidden; }
+.progress-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.5), transparent);
+  animation: confi-sweep 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer, .shimmer-text, .progress-shine::after { animation: none; }
+  .shimmer-text { color: var(--color-muted); }
+}
