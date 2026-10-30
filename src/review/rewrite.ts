@@ -50,7 +50,10 @@ export async function rewriteText(
     }
     const messages = 'id' in job ? rewriteMessages(job.id, piece) : customMessages(job.instruction, piece);
     const maxTokens = Math.min(2000, countWords(piece) * 3 + 60);
-    const reply = normalizeMarkers(cleanRewrite(await ai.generate(messages, (t) => show(normalizeMarkers(cleanRewrite(t))), maxTokens)));
+    // Paragraph by paragraph, a paragraph appears only once it's checked, so the person never sees one
+    // that gets swapped back. A whole-text rewrite streams as it's written.
+    const onPiece = byParagraph ? () => {} : (t: string) => show(normalizeMarkers(cleanRewrite(t)));
+    const reply = normalizeMarkers(cleanRewrite(await ai.generate(messages, onPiece, maxTokens)));
 
     const lostDetail = markersIn(piece).some((m) => !reply.includes(m));
     // Custom instructions may ask for a translation, so only built-in edits are checked for relevance.

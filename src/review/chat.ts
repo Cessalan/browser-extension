@@ -121,3 +121,26 @@ export function unlockProposal(text: string, locked: Map<string, string>): strin
   const { text: out, missing } = unlockDetails(text, locked);
   return missing.length ? null : out;
 }
+
+const contentWords = (t: string) => t.toLowerCase().match(/\p{L}{4,}/gu) ?? [];
+// How a message to the person starts, as opposed to a new version of their text.
+const MESSAGE_START = /^\s*(?:j['’]ai\b|je (?:vais|viens|peux|propose|vous)\b|voici\b|voilà\b|d['’]accord\b|bien sûr\b|parfait\b|here\b|i['’]ve\b|i have\b|i made\b|i changed\b|i rewrote\b|sure\b|okay\b|ok,)/i;
+
+/**
+ * True when what came back as "the new version" is really a message to the person ("I made it warmer…"):
+ * it starts like one and is much shorter than the text, or it has almost nothing in common with the text
+ * and is much shorter. It then goes to the chat, never next to the text. (A translation is as long as
+ * the text, so it isn't mistaken for a message.)
+ */
+export function looksLikeMessage(proposal: string, base: string): boolean {
+  const p = proposal.trim();
+  const pWords = p.split(/\s+/).length;
+  const bWords = base.trim().split(/\s+/).length;
+  if (MESSAGE_START.test(p) && pWords < bWords * 0.6) return true;
+  const baseWords = new Set(contentWords(base));
+  if (baseWords.size < 6) return false;
+  const mine = new Set(contentWords(p));
+  let shared = 0;
+  for (const w of baseWords) if (mine.has(w)) shared++;
+  return shared / baseWords.size < 0.15 && pWords < bWords * 0.5;
+}
