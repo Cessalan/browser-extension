@@ -17,6 +17,8 @@ import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
 import { translateText } from '../ai/translate';
 import { Assistant, type ChatEntry } from './Assistant';
 import { VersionsMenu, type Version } from './Versions';
+import { StyleOffer } from '../style/StyleOffer';
+import { getStyle } from '../style/store';
 import { CHAT_SCHEMA, chatMessages, splitReply, unlockProposal, type ChatTurn } from './chat';
 import { unlockDetails } from '../ai/mask';
 
@@ -325,9 +327,20 @@ export function ReviewEmail() {
     setInstruction('');
   }
 
+  // After copying (the email is done), offer to keep it as an example of the person's style.
+  const [styleOffer, setStyleOffer] = useState<string | null>(null);
+  const styleDeclined = useRef(false);
+  function offerStyle(text: string) {
+    const s = getStyle();
+    // Not when it's too short, already saved, or the person said no to learning their style this visit.
+    if (text.trim().split(/\s+/).length < 8 || (!s.enabled && (s.examples.length > 0 || styleDeclined.current))) return;
+    setStyleOffer(text);
+  }
+
   /** Copies the text, ready to paste into an email. */
   async function copy() {
     await copyRich(editor?.getHTML() ?? markdownToHtml(draft), plain);
+    offerStyle(plain);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -438,6 +451,7 @@ export function ReviewEmail() {
           status={status}
           onChange={(text) => setTask({ ...task, text })}
           onUse={() => { replaceDraft(task.text, task.label); setTask(null); }}
+          onCopied={(text) => offerStyle(markdownToPlain(text))}
           onDiscard={discard}
         />
       ) : (
@@ -498,6 +512,7 @@ export function ReviewEmail() {
       )}
       </div>
       </div>
+      {styleOffer && <StyleOffer text={styleOffer} onDone={() => setStyleOffer(null)} onDecline={() => (styleDeclined.current = true)} />}
     </div>
   );
 }
@@ -559,12 +574,14 @@ function Compare({
   onChange,
   onUse,
   onDiscard,
+  onCopied,
 }: {
   task: Rewrite;
   status: AiStatus;
   onChange: (text: string) => void;
   onUse: () => void;
   onDiscard: () => void;
+  onCopied: (text: string) => void;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
@@ -572,6 +589,7 @@ function Compare({
   // Copy the new version straight away, ready to paste, without replacing the text first.
   async function copyVersion() {
     await copyRich(markdownToHtml(task.text), markdownToPlain(task.text));
+    onCopied(task.text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }

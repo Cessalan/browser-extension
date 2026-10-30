@@ -1,5 +1,7 @@
 import type { Message } from '../ai/engine';
 import type { Key, Lang } from '../i18n';
+import { getStyle } from '../style/store';
+import { styleInstructions } from '../style/style';
 
 /*
  * Prompts are written for the smallest models: short rules in the text's own language, one worked
@@ -138,8 +140,10 @@ export function rewriteMessages(id: RewriteId, text: string): Message[] {
   const lang = detectTextLang(text);
   const { base, keep, format } = RULES[lang];
   const { instruction, example } = TASKS[id][lang];
+  // Spelling fixes keep the person's words as they are; other rewrites follow their style (a little: this runs per paragraph).
+  const style = id === 'fix' ? '' : styleInstructions(getStyle(), text, lang, 2, 250);
   return [
-    { role: 'system', content: `${base} ${instruction} ${keep} ${format}` },
+    { role: 'system', content: [`${base} ${instruction} ${keep} ${format}`, style].filter(Boolean).join('\n\n') },
     { role: 'user', content: `${instruction}\n\n${wrap(example[0])}` },
     { role: 'assistant', content: example[1] },
     { role: 'user', content: `${instruction}\n\n${wrap(text)}` },
@@ -151,8 +155,9 @@ export function customMessages(instruction: string, text: string): Message[] {
   const lang = detectTextLang(text);
   const { base, keep, format } = RULES[lang];
   const apply = lang === 'fr' ? 'Applique la consigne de la personne au texte.' : 'Apply the person’s instruction to the text.';
+  const style = styleInstructions(getStyle(), text, lang, 4, 600);
   return [
-    { role: 'system', content: `${base} ${apply} ${keep} ${format}` },
+    { role: 'system', content: [`${base} ${apply} ${keep} ${format}`, style].filter(Boolean).join('\n\n') },
     { role: 'user', content: `Instruction: ${instruction.trim()}\n\n${wrap(text)}` },
   ];
 }

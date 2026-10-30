@@ -1,6 +1,8 @@
 import type { Message } from '../ai/engine';
 import { lockDetails, unlockDetails } from '../ai/mask';
 import { cleanRewrite, type TextLang } from './prompts';
+import { getStyle } from '../style/store';
+import { styleInstructions } from '../style/style';
 
 /**
  * The assistant chat: the person says what they want ("warmer", "put the request first"), the AI
@@ -48,7 +50,12 @@ export function chatMessages(
   return {
     locked,
     messages: [
-      { role: 'system', content: SYSTEM.replace('{lang}', LANG_NAME[lang]).replace('{replyLang}', LANG_NAME[replyLang]) },
+      {
+        role: 'system',
+        content: [SYSTEM.replace('{lang}', LANG_NAME[lang]).replace('{replyLang}', LANG_NAME[replyLang]), styleInstructions(getStyle(), text, lang, 4, 600)]
+          .filter(Boolean)
+          .join('\n\n'),
+      },
       ...history.map((t) => ({ role: t.role, content: t.content }) as Message),
       { role: 'user', content: `<text>\n${lockedText}\n</text>\n\n${request.trim()}` },
     ],
