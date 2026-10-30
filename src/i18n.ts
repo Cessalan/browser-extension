@@ -94,6 +94,11 @@ const en = {
   'kind.email': 'Email address',
   'kind.date': 'Date',
   'kind.id': 'Long ID number',
+  'kind.name': 'Name',
+  'kind.address': 'Address',
+  'kind.place': 'Place',
+  'sensitive.forget': 'Not private: stop protecting it',
+  'sensitive.byAi': 'Found by the AI',
 
   // Setup (device check + AI mode)
   'setup.title': 'Setup',
@@ -385,6 +390,11 @@ const fr: Record<Key, string> = {
   'kind.email': 'Adresse courriel',
   'kind.date': 'Date',
   'kind.id': "Long numéro d'identification",
+  'kind.name': 'Nom',
+  'kind.address': 'Adresse',
+  'kind.place': 'Lieu',
+  'sensitive.forget': 'Pas confidentiel : ne plus le protéger',
+  'sensitive.byAi': 'Repéré par l’IA',
 
   'setup.title': 'Configuration',
   'setup.intro': "Vérifiez que cet ordinateur peut faire fonctionner Confi et choisissez comment l'IA fonctionne. Tout reste sur cet ordinateur.",
@@ -588,19 +598,13 @@ const fr: Record<Key, string> = {
 };
 
 const DICTS: Record<Lang, Record<Key, string>> = { en, fr };
-const STORAGE_KEY = 'lang';
 
 export function detectLang(languages: readonly string[] = navigator.languages ?? [navigator.language]): Lang {
   return languages[0]?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
 }
 
+/** Always the browser's language when Confi opens; the header button switches it for the visit only. */
 function initialLang(): Lang {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'en' || saved === 'fr') return saved;
-  } catch {
-    // Storage blocked: fall back to the browser language.
-  }
   return detectLang();
 }
 
@@ -617,11 +621,6 @@ if (typeof document !== 'undefined') document.documentElement.lang = current;
 export function setLang(lang: Lang) {
   current = lang;
   document.documentElement.lang = lang;
-  try {
-    localStorage.setItem(STORAGE_KEY, lang);
-  } catch {
-    // Not critical: the choice just won't be remembered.
-  }
   listeners.forEach((fn) => fn(lang));
 }
 
