@@ -29,3 +29,14 @@ describe('looksUnrelated', () => {
     expect(looksUnrelated('Suivi pour le patient dont on a parlé mardi, il est pret pour le congé vers la réadaptation.', 'Je fais suite à notre discussion de mardi : le patient est prêt pour son congé en réadaptation.')).toBe(false);
   });
 });
+
+describe('stripThinking', () => {
+  it('removes thinking blocks, empty or not, and hides one still streaming', async () => {
+    const { stripThinking } = await import('./quality');
+    expect(stripThinking('<think>\n\n</think>\n\nNote: "Built-in AI"')).toBe('Note: "Built-in AI"');
+    expect(stripThinking('<think>let me see…</think>Bonjour')).toBe('Bonjour');
+    expect(stripThinking('<think>still thinking')).toBe('');
+    expect(stripThinking('</think>\nHello')).toBe('Hello');
+    expect(stripThinking('No tags here.')).toBe('No tags here.');
+  });
+});
