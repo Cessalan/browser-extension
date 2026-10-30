@@ -332,7 +332,9 @@ export function ReviewEmail() {
     setTask(null);
     setError(null);
     resetChat();
-    focusEditor.current = true;
+    // The editor is on screen (button above the text) or comes back once the new version closes.
+    if (editor && !task) setTimeout(() => editor.commands.focus('end'), 0);
+    else focusEditor.current = true;
   }
 
   /** Translates the draft into the other language (French ↔ English). */
@@ -648,7 +650,17 @@ function Compare({
     <section class="rounded-xl border border-line bg-surface shadow-card">
       <div class="grid md:grid-cols-2">
         <div class="border-b border-line md:border-b-0 md:border-r">
-          <PaneHeader title={t('editor.title')} />
+          <PaneHeader
+            title={t('editor.title')}
+            action={
+              task.done && (
+                // Same place and look as "Copy": each pane's action sits in its own corner.
+                <button type="button" class={CORNER_BUTTON} onClick={onNewText} title={t('editor.newTextTitle')}>
+                  <FilePlus size={15} aria-hidden="true" /> {t('editor.newText')}
+                </button>
+              )
+            }
+          />
           <div class="whitespace-pre-wrap p-4 text-[15px] leading-relaxed">
             {parts ? <DiffText parts={parts} side="before" /> : markdownToPlain(task.original)}
           </div>
@@ -656,14 +668,20 @@ function Compare({
         <div class="bg-brand-soft/30">
           <PaneHeader
             title={t('compare.newVersion')}
+            hint={
+              task.done &&
+              changes && (
+                <>
+                  <span class="text-brand">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
+                </>
+              )
+            }
             action={
               task.done && (
                 // Where people look to copy: the corner of the text itself.
                 <button
                   type="button"
-                  class={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    copied ? 'border-green-200 bg-green-50 text-good' : 'border-line bg-surface text-ink shadow-sm hover:border-brand/40 hover:text-brand'
-                  }`}
+                  class={copied ? `${CORNER_BUTTON} !border-green-200 !bg-green-50 !text-good` : CORNER_BUTTON}
                   onClick={() => void copyVersion()}
                 >
                   {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
@@ -693,20 +711,11 @@ function Compare({
           )}
         </div>
       </div>
+      {/* Done: the actions are in the pane corners; the footer only remains to leave edit mode. */}
+      {(!task.done || (editing && parts)) && (
       <div class="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3">
         {task.done ? (
-          <>
-            <Button key="new" variant="secondary" onClick={onNewText} icon={FilePlus} title={t('editor.newTextTitle')}>{t('editor.newText')}</Button>
-            {/* "Click to edit" is the new version's tooltip; the footer stays on one line. */}
-            {editing && parts && (
-              <button type="button" class="text-xs text-muted underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
-            )}
-            {changes && (
-              <span class="ml-auto text-xs text-muted">
-                <span class="text-brand">+{changes.added}</span> / <span class="text-bad">−{changes.removed}</span> {t('compare.words')}
-              </span>
-            )}
-          </>
+          <button type="button" class="text-xs text-muted underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
         ) : (
           <>
             <Button key="stop" variant="secondary" onClick={() => void ai.stop()} icon={Square}>{t('compare.stop')}</Button>
@@ -714,11 +723,16 @@ function Compare({
           </>
         )}
       </div>
+      )}
     </section>
   );
 }
 
-function PaneHeader({ title, hint, action }: { title: string; hint?: string; action?: ComponentChildren }) {
+/** The action in a pane's top corner ("Copy", "New text"). */
+const CORNER_BUTTON =
+  'inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink shadow-sm transition-colors hover:border-brand/40 hover:text-brand';
+
+function PaneHeader({ title, hint, action }: { title: string; hint?: ComponentChildren; action?: ComponentChildren }) {
   return (
     <div class="flex h-11 items-center gap-2 border-b border-line px-4">
       <h3 class="font-medium">{title}</h3>
