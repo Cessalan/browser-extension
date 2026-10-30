@@ -770,11 +770,10 @@ function SensitiveBar({
         <span class="inline-flex items-center rounded-full border border-line bg-canvas text-xs text-ink hover:border-brand/40">
           <button
             type="button"
-            class="inline-flex items-center gap-1 rounded-full py-0.5 pl-2.5 pr-2.5 hover:bg-brand-soft/50"
+            class="rounded-full py-0.5 pl-2.5 pr-2.5 hover:bg-brand-soft/50"
             title={m.learned ? `${t('sensitive.byAi')} · ${t('sensitive.jump')}` : t('sensitive.jump')}
             onClick={() => onSelect(m)}
           >
-            {m.learned && <Sparkles size={11} class="text-brand" aria-hidden="true" />}
             {t(`kind.${m.kind}`)}
             {lang === 'fr' ? ' : ' : ': '}
             <code class="font-mono">{m.text}</code>
