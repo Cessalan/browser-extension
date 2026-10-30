@@ -1,4 +1,4 @@
-import { findSensitive } from '../review/sensitive';
+import { detailValue, findSensitive } from '../review/sensitive';
 
 /**
  * Locks sensitive details (file numbers, dates of birth, phone numbers…) before the AI sees the text:
@@ -6,7 +6,8 @@ import { findSensitive } from '../review/sensitive';
  * The AI therefore can't alter or drop a number without it being noticed.
  */
 export function lockDetails(text: string): { text: string; locked: Map<string, string> } {
-  const matches = findSensitive(text);
+  // Lock the value itself, not its label: in "dossier 4482913" the AI may still translate or fix "dossier".
+  const matches = findSensitive(text).map(detailValue);
   const locked = new Map(matches.map((m, i) => [`[X${i + 1}]`, m.text]));
   let out = text;
   // Replace from the end so earlier positions stay valid.

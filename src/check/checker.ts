@@ -1,6 +1,6 @@
 import { ai } from '../ai/engine';
 import type { TextLang } from '../review/prompts';
-import { findSensitive } from '../review/sensitive';
+import { detailValue, findSensitive } from '../review/sensitive';
 import { parseEdits, proofreadMessages, verifyEdits } from './aiEdits';
 import { findBasics } from './rules';
 import { findShorthand } from './shorthand';
@@ -92,8 +92,7 @@ export async function aiProofread(text: string, lang: TextLang): Promise<Issue[]
 
 /** Protected details are never "corrected". Labels like "dossier" in "dossier 4482913" can be; the number can't. */
 function protectedRanges(text: string) {
-  return findSensitive(text).map((m) => {
-    const digit = m.kind === 'email' ? 0 : Math.max(0, m.text.search(/\d/));
-    return { start: m.index + digit, end: m.index + m.text.length };
-  });
+  return findSensitive(text)
+    .map(detailValue)
+    .map((m) => ({ start: m.index, end: m.index + m.text.length }));
 }

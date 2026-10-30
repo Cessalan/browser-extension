@@ -5,12 +5,16 @@ import { Button } from '../ui';
 import { useI18n, type Key, type Lang } from '../i18n';
 import {
   Briefcase, Check, ClipboardCheck, Copy, Download, Eraser, Lightbulb, LoaderCircle,
-  Info, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
+  Info, Languages, Scissors, Sparkles, TriangleAlert, SpellCheck, Square, Undo2, X, type LucideIcon,
 } from 'lucide-preact';
 import { findSensitive, type SensitiveMatch } from './sensitive';
 import { REWRITES, detectTextLang, parseBullets, reviewMessages, type RewriteId } from './prompts';
 import { IssuePopover, isSureFix, useProofread } from './proofread';
 import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
+import { translateText } from '../ai/translate';
+import { Assistant, type ChatEntry } from './Assistant';
+import { chatMessages, splitReply, unlockProposal, type ChatTurn } from './chat';
+import { unlockDetails } from '../ai/mask';
 
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
 import { countChanges, diffWords, type DiffPart } from './diff';
@@ -35,7 +39,8 @@ thx
 Jordan` };
 
 type Review = { kind: 'review'; text: string; done: boolean; forDraft: string; startedAt: number };
-type Rewrite = { kind: 'rewrite'; label: string; original: string; text: string; done: boolean; startedAt: number };
+/** `translated`: the suggestion is in the other language, so it's shown side by side without highlighting changes. */
+type Rewrite = { kind: 'rewrite'; label: string; original: string; text: string; done: boolean; startedAt: number; translated?: boolean };
 type Task = Review | Rewrite;
 /** Runs one AI request, streaming the text so far; returns the final text. */
 type Exec = (onText: (text: string) => void) => Promise<string>;
@@ -61,7 +66,8 @@ export function ReviewEmail() {
   const sensitive = useMemo(() => findSensitive(plain), [plain]);
   const running = task !== null && !task.done;
   // Underlines in the editor: spelling, grammar and shorthand, in the text's own language.
-  const proof = useProofread(editor, plain.trim() ? detectTextLang(plain) : lang);
+  const textLang = plain.trim() ? detectTextLang(plain) : lang;
+  const proof = useProofread(editor, textLang);
   const words = countWords(plain);
 
   // Drafts are never saved, so warn before the tab closes with one in progress.
@@ -149,9 +155,86 @@ export function ReviewEmail() {
   }
 
   /** `original` is what the diff compares against; `input` is what gets rewritten (a previous suggestion when refining). */
-  function rewrite(label: string, original: string, job: RewriteJob, input = original) {
-    void run({ kind: 'rewrite', label, original, text: '', done: false, startedAt: Date.now() }, (onText) =>
+  function rewrite(label: string, original: string, job: RewriteJob, input = original, translated = false) {
+    void run({ kind: 'rewrite', label, original, text: '', done: false, startedAt: Date.now(), translated }, (onText) =>
       rewriteText(job, input, onText).then((r) => r.text),
+    );
+  }
+
+  // Assistant chat, with Chrome's built-in AI (smart enough to hold a conversation). Never saved.
+  const chatOn = ai.mode === 'chrome';
+  // The mode is picked from this computer's specs after the first render: show the chat once it's known.
+  const [, modeKnown] = useState(false);
+  useEffect(() => void ai.resolveMode().then(() => modeKnown(true)), []);
+  const [chatLog, setChatLog] = useState<ChatEntry[]>([]);
+  const [chatBusy, setChatBusy] = useState<{ say: string; writing: boolean } | null>(null);
+  const chatHistory = useRef<ChatTurn[]>([]);
+  const chatRun = useRef(0);
+
+  /** Sends a request to the assistant. A proposed version opens side by side; the text itself never changes on its own. */
+  async function sendChat(request: string) {
+    const run = ++chatRun.current;
+    // With a suggestion on screen, the request applies to that suggestion (diffed against the original text).
+    const current = task?.kind === 'rewrite' && task.done ? task : null;
+    const base = current?.text ?? draft;
+    const original = current?.original ?? draft;
+    const startedAt = Date.now();
+    setError(null);
+    setChatLog((l) => [...l, { role: 'user', say: request }]);
+    setChatBusy({ say: '', writing: false });
+    const { messages, locked } = chatMessages(chatHistory.current, request, base, detectTextLang(markdownToPlain(base)) );
+    const proposal = (text: string, done: boolean): Task => ({
+      kind: 'rewrite', label: quote(request, lang), original, text, done, startedAt, translated: current?.translated,
+    });
+    try {
+      const words = countWords(markdownToPlain(base));
+      const raw = await ai.generate(
+        messages,
+        (soFar) => {
+          if (run !== chatRun.current) return;
+          const r = splitReply(soFar);
+          setChatBusy({ say: r.say, writing: r.writing });
+          if (r.text) setTask(proposal(unlockDetails(r.text, locked).text, false));
+        },
+        Math.min(2000, words * 3 + 200),
+      );
+      if (run !== chatRun.current) return;
+      const r = splitReply(raw);
+      const text = r.text && unlockProposal(r.text, locked);
+      if (text) setTask(proposal(text, true));
+      else if (r.text) setTask(current); // the AI dropped a protected detail: keep what was there
+      chatHistory.current = [...chatHistory.current, { role: 'user' as const, content: request }, { role: 'assistant' as const, content: r.say || '…' }].slice(-12);
+      setChatLog((l) => [...l, { role: 'assistant', say: r.say, proposal: text ? 'shown' : r.text ? 'setAside' : undefined }]);
+    } catch {
+      if (run === chatRun.current) setChatLog((l) => [...l, { role: 'assistant', say: '', failed: true }]);
+    } finally {
+      if (run === chatRun.current) setChatBusy(null);
+    }
+  }
+
+  function resetChat() {
+    chatRun.current++;
+    chatHistory.current = [];
+    setChatLog([]);
+    setChatBusy(null);
+  }
+
+  /** Closes the suggestion (and stops the assistant if it was still writing it). */
+  function discard() {
+    if (chatBusy) {
+      chatRun.current++;
+      setChatBusy(null);
+      void ai.stop();
+    }
+    setTask(null);
+  }
+
+  /** Translates the draft into the other language (French ↔ English). */
+  function translate() {
+    const to = textLang === 'fr' ? 'en' : 'fr';
+    const label = t(to === 'en' ? 'translate.inEn' : 'translate.inFr');
+    void run({ kind: 'rewrite', label, original: draft, text: '', done: false, startedAt: Date.now(), translated: true }, (onText) =>
+      translateText(draft, textLang, to, onText),
     );
   }
 
@@ -163,7 +246,7 @@ export function ReviewEmail() {
     if (!text || running) return;
     if (task?.kind === 'rewrite' && task.done) {
       // Keep diffing against the user's original email.
-      rewrite(quote(text, lang), task.original, { instruction: text }, task.text);
+      rewrite(quote(text, lang), task.original, { instruction: text }, task.text, task.translated);
     } else if (plain.trim()) {
       rewrite(quote(text, lang), draft, { instruction: text });
     } else {
@@ -209,17 +292,36 @@ export function ReviewEmail() {
             {t(r.label)}
           </Button>
         ))}
-        <InstructionBox
-          trailing={needsAttention(status) ? <AiPill status={status} /> : undefined}
-          value={instruction}
-          onInput={setInstruction}
-          onSubmit={applyInstruction}
-          placeholder={refining ? t('compare.refine') : t('custom.placeholder')}
-          button={t('custom.apply')}
-          disabled={running || (!refining && !plain.trim())}
-        />
+        <Button variant="secondary" icon={Languages} onClick={translate} disabled={!canAct}>
+          {t(textLang === 'fr' ? 'translate.toEn' : 'translate.toFr')}
+        </Button>
+        {/* With the assistant chat on, instructions go through the chat instead. */}
+        {chatOn ? (
+          needsAttention(status) && <span class="ml-auto"><AiPill status={status} /></span>
+        ) : (
+          <InstructionBox
+            trailing={needsAttention(status) ? <AiPill status={status} /> : undefined}
+            value={instruction}
+            onInput={setInstruction}
+            onSubmit={applyInstruction}
+            placeholder={refining ? t('compare.refine') : t('custom.placeholder')}
+            button={t('custom.apply')}
+            disabled={running || (!refining && !plain.trim())}
+          />
+        )}
       </div>
 
+      <div class={chatOn ? 'grid items-start gap-4 lg:grid-cols-[340px_minmax(0,1fr)]' : ''}>
+      {chatOn && (
+        <Assistant
+          entries={chatLog}
+          busy={chatBusy}
+          disabled={!plain.trim() || running}
+          onSend={(m) => void sendChat(m)}
+          onReset={resetChat}
+        />
+      )}
+      <div class="min-w-0 space-y-4">
       {sensitive.length > 0 && <SensitiveBar matches={sensitive} onSelect={showMatch} />}
       {switchedTo && (
         <div class="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand-soft/50 px-4 py-2.5 text-sm" role="status">
@@ -264,10 +366,10 @@ export function ReviewEmail() {
           status={status}
           onChange={(text) => setTask({ ...task, text })}
           onUse={() => { replaceDraft(task.text); setTask(null); }}
-          onDiscard={() => setTask(null)}
+          onDiscard={discard}
         />
       ) : (
-        <div class={`grid items-start gap-4 ${task ? 'lg:grid-cols-[minmax(0,1fr)_340px]' : ''}`}>
+        <div class={`grid items-start gap-4 ${task && !chatOn ? 'lg:grid-cols-[minmax(0,1fr)_340px]' : ''}`}>
           <section class="rounded-xl border border-line bg-surface shadow-card">
             <div class="flex items-center gap-2 border-b border-line px-4 py-2">
               <h3 class="whitespace-nowrap font-medium">{t('editor.title')}</h3>
@@ -312,6 +414,8 @@ export function ReviewEmail() {
           )}
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 }
@@ -377,7 +481,7 @@ function Compare({
     if (!task.done) setEditing(false);
   }, [task.done]);
   const parts = useMemo(
-    () => (task.done ? diffWords(markdownToPlain(task.original), markdownToPlain(task.text)) : null),
+    () => (task.done && !task.translated ? diffWords(markdownToPlain(task.original), markdownToPlain(task.text)) : null),
     [task.done, task.original, task.text],
   );
   const changes = parts && countChanges(parts);
@@ -407,11 +511,17 @@ function Compare({
             </div>
           ) : (
             <div
-              class={`min-h-[300px] whitespace-pre-wrap p-4 text-[15px] leading-relaxed ${parts ? 'cursor-text rounded-b-xl hover:bg-white/60' : ''}`}
-              onClick={() => parts && setEditing(true)}
-              title={parts ? t('compare.clickToEdit') : undefined}
+              class={`min-h-[300px] whitespace-pre-wrap p-4 text-[15px] leading-relaxed ${task.done ? 'cursor-text rounded-b-xl hover:bg-white/60' : ''}`}
+              onClick={() => task.done && setEditing(true)}
+              title={task.done ? t('compare.clickToEdit') : undefined}
             >
-              {parts ? <DiffText parts={parts} side="after" /> : <Streaming text={markdownToPlain(task.text)} startedAt={task.startedAt} status={status} />}
+              {parts ? (
+                <DiffText parts={parts} side="after" />
+              ) : task.done ? (
+                markdownToPlain(task.text)
+              ) : (
+                <Streaming text={markdownToPlain(task.text)} startedAt={task.startedAt} status={status} />
+              )}
             </div>
           )}
         </div>
@@ -420,7 +530,7 @@ function Compare({
         {task.done ? (
           <>
             <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
-            <span class="text-xs text-muted">{editing ? (
+            <span class="text-xs text-muted">{editing && parts ? (
               <button type="button" class="underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
             ) : t('compare.clickToEdit')}</span>
             {changes && (

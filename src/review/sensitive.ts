@@ -35,3 +35,13 @@ export function findSensitive(text: string): SensitiveMatch[] {
   }
   return found.sort((a, b) => a.index - b.index);
 }
+
+/**
+ * The identifying value inside a match, without its label: "4482913" in "dossier 4482913",
+ * "14/03/1952" in "né le 14/03/1952". Labels can be translated or corrected; values never are.
+ */
+export function detailValue(m: SensitiveMatch): SensitiveMatch {
+  if (m.kind !== 'mrn' && m.kind !== 'dob') return m;
+  const label = /^[^\d]*?(?=[A-Z0-9-]*\d[\w/.-]*$)/u.exec(m.text)?.[0] ?? '';
+  return { ...m, index: m.index + label.length, text: m.text.slice(label.length) };
+}

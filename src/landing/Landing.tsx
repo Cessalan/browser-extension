@@ -265,6 +265,8 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
   const secure = window.isSecureContext;
   const installed = status.state === 'ready' || (status.state === 'idle' && status.cached === true);
   const size = modeInfo(shownMode).downloadMB;
+  // Chrome's AI: Chrome downloads it itself, once, for every site; Confi doesn't know its size.
+  const byChrome = !!modeInfo(shownMode).builtin;
   const lowSpace = device?.storageFreeGB != null && device.storageFreeGB * 1000 < size * 1.5;
 
   function choose(m: AiMode) {
@@ -354,12 +356,12 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
             <div>
               <div class="flex justify-between text-sm">
                 <span class="font-medium">{t('setup.downloading', { pct: Math.round(status.fraction * 100) })}</span>
-                <span class="text-muted">~{size} {t('setup.mb')}</span>
+                <span class="text-muted">{byChrome ? t('setup.byChrome') : `~${size} ${t('setup.mb')}`}</span>
               </div>
               <div class="mt-2 h-2 overflow-hidden rounded-full bg-brand-soft">
                 <div class="h-full bg-brand transition-all" style={{ width: `${Math.round(status.fraction * 100)}%` }} />
               </div>
-              <p class="mt-2 text-sm text-muted">{t('land.start.downloadingHint')}</p>
+              <p class="mt-2 text-sm text-muted">{t(byChrome ? 'land.start.chromeHint' : 'land.start.downloadingHint')}</p>
             </div>
           ) : (
             <div class="flex flex-wrap items-center gap-4">
@@ -368,7 +370,7 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
                 class="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 font-medium text-white shadow-button hover:bg-brand-strong"
                 onClick={() => void ai.load().catch(() => {})}
               >
-                <Download size={18} aria-hidden="true" /> {t('land.start.download', { mb: size })}
+                <Download size={18} aria-hidden="true" /> {byChrome ? t('ai.downloadChrome') : t('land.start.download', { mb: size })}
               </button>
               <p class="text-sm text-muted">{t('land.start.once')}</p>
               {status.state === 'error' && <p class="w-full text-sm text-bad">{t('land.start.error')}</p>}
