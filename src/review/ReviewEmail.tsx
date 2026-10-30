@@ -491,21 +491,13 @@ function Compare({
     <section class="rounded-xl border border-line bg-surface shadow-card">
       <div class="grid md:grid-cols-2">
         <div class="border-b border-line md:border-b-0 md:border-r">
-          <PaneHeader title={t('editor.title')} hint={parts ? t('compare.removed') : undefined} />
+          <PaneHeader title={t('editor.title')} />
           <div class="whitespace-pre-wrap p-4 text-[15px] leading-relaxed">
             {parts ? <DiffText parts={parts} side="before" /> : markdownToPlain(task.original)}
           </div>
         </div>
         <div class="bg-brand-soft/30">
-          <PaneHeader
-            title={t('compare.suggestion', { label: task.label })}
-            hint={parts && !editing ? t('compare.added') : undefined}
-            action={
-              <button type="button" class="rounded-md p-1 text-muted hover:bg-white hover:text-ink" onClick={onDiscard} title={`${t('compare.keepMine')} (Esc)`} aria-label={t('compare.keepMine')}>
-                <X size={16} />
-              </button>
-            }
-          />
+          <PaneHeader title={t('compare.newVersion')} />
           {editing ? (
             <div class="bg-surface ring-2 ring-inset ring-brand/40">
               <RichEditor initialMarkdown={task.text} onChange={onChange} autofocus class="min-h-[300px] p-4 text-[15px] leading-relaxed" />
@@ -531,6 +523,7 @@ function Compare({
         {task.done ? (
           <>
             <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
+            <Button key="keep" variant="secondary" onClick={onDiscard} title="Esc">{t('compare.keepMine')}</Button>
             <span class="text-xs text-muted">{editing && parts ? (
               <button type="button" class="underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
             ) : t('compare.clickToEdit')}</span>

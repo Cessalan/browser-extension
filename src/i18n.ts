@@ -60,9 +60,8 @@ const en = {
   'editor.long': 'Long text: the AI works best under ~1,000 words.',
 
   // Review: compare
-  'compare.removed': 'Removed text in red',
-  'compare.added': 'Added text in blue',
   'compare.suggestion': 'Suggestion: {label}',
+  'compare.newVersion': 'New version',
   'compare.use': 'Use this version',
   'compare.clickToEdit': 'Click the suggestion to edit it',
   'compare.showChanges': 'Show changes',
@@ -342,9 +341,8 @@ const fr: Record<Key, string> = {
   'editor.notSaved': "Rien n'est enregistré. Fermer l'onglet efface tout.",
   'editor.long': "Texte long : l'IA fonctionne mieux sous ~1 000 mots.",
 
-  'compare.removed': 'Texte retiré en rouge',
-  'compare.added': 'Texte ajouté en bleu',
   'compare.suggestion': 'Suggestion : {label}',
+  'compare.newVersion': 'Nouvelle version',
   'compare.use': 'Utiliser cette version',
   'compare.clickToEdit': 'Cliquez sur la suggestion pour la modifier',
   'compare.showChanges': 'Voir les changements',
