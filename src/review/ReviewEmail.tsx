@@ -585,7 +585,6 @@ function Compare({
         {task.done ? (
           <>
             <Button key="use" onClick={onUse} icon={Check} title="Ctrl + Enter">{t('compare.use')}</Button>
-            <Button key="keep" variant="ghost" onClick={onDiscard} title="Esc">{t('compare.keepMine')}</Button>
             {/* "Click to edit" is the new version's tooltip; the footer stays on one line. */}
             {editing && parts && (
               <button type="button" class="text-xs text-muted underline hover:text-ink" onClick={() => setEditing(false)}>{t('compare.showChanges')}</button>
