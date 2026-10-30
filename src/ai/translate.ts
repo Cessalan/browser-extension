@@ -1,5 +1,5 @@
 import { ai, type Message } from './engine';
-import { lockDetails, markersIn, unlockDetails } from './mask';
+import { dropMarkers, lockDetails, markersIn, unlockDetails } from './mask';
 import { cleanRewrite, type TextLang } from '../review/prompts';
 import { UnreliableError } from '../review/rewrite';
 
@@ -81,7 +81,7 @@ export async function translateText(markdown: string, from: TextLang, to: TextLa
       continue;
     }
     let translated = chrome ? await chrome.translate(content) : await aiTranslate(content, to);
-    translated = translated.replace(/\[\s*x\s*(\d+)\s*\]/gi, '[X$1]').trim();
+    translated = dropMarkers(translated.replace(/\[\s*x\s*(\d+)\s*\]/gi, '[X$1]'), markersIn(content)).trim();
     const ratio = translated.split(/\s+/).length / content.trim().split(/\s+/).length;
     const keptDetails = markersIn(content).every((m) => translated.includes(m));
     if (!keptDetails || (!chrome && (ratio < 0.4 || ratio > 2.5))) throw new UnreliableError();
