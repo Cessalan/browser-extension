@@ -22,6 +22,22 @@ describe('assistant chat', () => {
     expect(splitReply('Fait.\n<text>\nA\n\nB\n</text>')).toEqual({ say: 'Fait.', text: 'A\n\nB', writing: false });
   });
 
+  it('reads the JSON reply, even while it is still streaming', () => {
+    expect(splitReply('{"say":"J’ai mis la demande en premier.","text":"Pouvez-vous\\nsigner')).toEqual({
+      say: 'J’ai mis la demande en premier.',
+      text: 'Pouvez-vous\nsigner',
+      writing: true,
+    });
+    expect(splitReply('{"say":"Quelle date?","text":""}')).toEqual({ say: 'Quelle date?', text: null, writing: false });
+    expect(splitReply('{"say":"Fait \\u00e0 100 %.","text":"A\\n\\nB"}')).toEqual({ say: 'Fait à 100 %.', text: 'A\n\nB', writing: false });
+  });
+
+  it('recognizes a whole new version written straight into the reply', () => {
+    const reply = 'I made it warmer.\n\nDear Dr. Patel,\n\nI hope you are well. The patient is ready for Friday.';
+    expect(splitReply(reply, 12)).toEqual({ say: 'I made it warmer.', text: 'Dear Dr. Patel,\n\nI hope you are well. The patient is ready for Friday.', writing: false });
+    expect(splitReply('Sure.\n\nAnything else?', 12).text).toBeNull();
+  });
+
   it('sets a proposal aside if it lost a protected detail', () => {
     const locked = new Map([['[X1]', '4482913']]);
     expect(unlockProposal('Dossier [X1] prêt.', locked)).toBe('Dossier 4482913 prêt.');

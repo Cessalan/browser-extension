@@ -41,7 +41,8 @@ function isGpuLost(err: unknown) {
 interface Backend {
   /** Which hardware is doing the work (shown nowhere in the UI; used for decisions and support). */
   kind: 'builtin' | 'gpu' | 'cpu';
-  generate(messages: Message[], onText: (text: string) => void, maxTokens: number): Promise<string>;
+  /** `schema`: a JSON schema the reply must follow. Only Chrome's AI enforces it; the others just see the prompt. */
+  generate(messages: Message[], onText: (text: string) => void, maxTokens: number, schema?: object): Promise<string>;
   stop(): void;
   unload(): Promise<void>;
 }
@@ -149,9 +150,9 @@ async function startBuiltin(onProgress: Progress): Promise<Backend> {
   // Starting a first session makes Chrome download its model if needed (with progress).
   await createBuiltinSession([], (f) => onProgress(f, '')).then((s) => s.destroy());
   let abort = new AbortController();
-  return {
+  const backend: Backend = {
     kind: 'builtin',
-    async generate(messages, onText) {
+    async generate(messages, onText, _maxTokens, schema) {
       abort = new AbortController();
       const signal = abort.signal;
       const turns = messages.map((m) => ({ role: m.role as 'system' | 'user' | 'assistant', content: String(m.content) }));
@@ -160,12 +161,18 @@ async function startBuiltin(onProgress: Progress): Promise<Backend> {
       let text = '';
       try {
         // Chrome streams new pieces of the reply, not the whole reply so far.
-        for await (const piece of session.promptStreaming(last.content, { signal })) {
+        for await (const piece of session.promptStreaming(last.content, { signal, responseConstraint: schema })) {
           text += piece;
           onText(text);
         }
       } catch (err) {
-        if (!signal.aborted) throw err;
+        if (signal.aborted) return text;
+        // An older Chrome without structured replies: ask again without the schema (the prompt still describes the format).
+        if (schema && !text) {
+          session.destroy();
+          return backend.generate(messages, onText, _maxTokens);
+        }
+        throw err;
       } finally {
         session.destroy();
       }
@@ -174,6 +181,7 @@ async function startBuiltin(onProgress: Progress): Promise<Backend> {
     stop: () => abort.abort(),
     unload: async () => abort.abort(),
   };
+  return backend;
 }
 
 /** True if the CPU model's files are already in the browser cache (transformers.js keeps them in Cache Storage). */
@@ -317,7 +325,7 @@ class LocalAI {
    * If the graphics chip is reset mid-task, steps down to a lighter mode (Faster, then the processor)
    * and retries the same request, so the person gets their answer instead of an error.
    */
-  async generate(messages: Message[], onText: (text: string) => void, maxTokens = 1024): Promise<string> {
+  async generate(messages: Message[], onText: (text: string) => void, maxTokens = 1024, schema?: object): Promise<string> {
     for (;;) {
       const backend = await this.load();
       // Loop guard: if the reply starts repeating itself, stop the model and keep the part before the loop.
@@ -334,7 +342,7 @@ class LocalAI {
         }
       };
       try {
-        const text = await backend.generate(messages, guarded, maxTokens);
+        const text = await backend.generate(messages, guarded, maxTokens, schema);
         return cut ?? cutRepetition(text).text;
       } catch (err) {
         if (backend.kind !== 'gpu' || !isGpuLost(err)) throw err;
@@ -426,11 +434,12 @@ async function mockGenerate(messages: Message[], onText: (text: string) => void)
     // Assistant chat: a question if the request mentions a date, otherwise a short note and a new version.
     const request = user.split('</text>').pop()!.trim();
     await new Promise((r) => setTimeout(r, 600));
-    if (/date/i.test(request)) return /[àâéèêç]/.test(request) ? 'Quelle date voulez-vous indiquer?' : 'Which date should I use?';
+    if (/date/i.test(request)) return JSON.stringify({ say: /\b(la|le|pour)\b/i.test(request) ? 'Quelle date voulez-vous indiquer?' : 'Which date should I use?', text: '' });
     const fr = /[àâéèêçù]/.test(draft);
     const politer = draft.replace(/^(Bonjour|Hi)([^\n]*)/, fr ? 'Bonjour$2' : 'Hello$2').replace(/\n\n(merci|thx)\b/i, fr ? '\n\nMerci beaucoup et bonne journée,' : '\n\nThank you very much,');
     let text = '';
-    const reply = `${fr ? 'J’ai rendu le ton plus poli et ajouté une formule de politesse.' : 'I made the tone more polite and added a closing line.'}\n<text>\n${politer}\n</text>`;
+    // Same shape as Chrome's AI with a JSON schema.
+    const reply = JSON.stringify({ say: fr ? 'J’ai rendu le ton plus poli et ajouté une formule de politesse.' : 'I made the tone more polite and added a closing line.', text: politer });
     for (const word of reply.split(/(?<=\s)/)) {
       text += word;
       onText(text);

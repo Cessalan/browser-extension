@@ -13,7 +13,7 @@ import { IssuePopover, isSureFix, useProofread } from './proofread';
 import { UnreliableError, rewriteText, type RewriteJob } from './rewrite';
 import { translateText } from '../ai/translate';
 import { Assistant, type ChatEntry } from './Assistant';
-import { chatMessages, splitReply, unlockProposal, type ChatTurn } from './chat';
+import { CHAT_SCHEMA, chatMessages, splitReply, unlockProposal, type ChatTurn } from './chat';
 import { unlockDetails } from '../ai/mask';
 
 const REWRITE_ICONS: Record<RewriteId, LucideIcon> = { clearer: Lightbulb, professional: Briefcase, shorter: Scissors, fix: SpellCheck };
@@ -192,14 +192,15 @@ export function ReviewEmail() {
         messages,
         (soFar) => {
           if (run !== chatRun.current) return;
-          const r = splitReply(soFar);
+          const r = splitReply(soFar, words);
           setChatBusy({ say: r.say, writing: r.writing });
           if (r.text) setTask(proposal(unlockDetails(r.text, locked).text, false));
         },
         Math.min(2000, words * 3 + 200),
+        CHAT_SCHEMA,
       );
       if (run !== chatRun.current) return;
-      const r = splitReply(raw);
+      const r = splitReply(raw, words);
       const text = r.text && unlockProposal(r.text, locked);
       if (text) setTask(proposal(text, true));
       else if (r.text) setTask(current); // the AI dropped a protected detail: keep what was there
