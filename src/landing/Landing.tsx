@@ -407,7 +407,13 @@ function GetStarted({ onOpen }: { onOpen: () => void }) {
           ) : status.state === 'loading' ? (
             <div>
               <DownloadProgress fraction={status.fraction} sizeMB={size} byChrome={byChrome} />
-              <p class="mt-3 text-xs text-muted">{t(byChrome ? 'land.start.chromeHint' : 'land.start.downloadingHint')}</p>
+              <div class="mt-3 flex flex-wrap items-center gap-4">
+                <p class="text-xs text-muted">{t(byChrome ? 'land.start.chromeHint' : 'land.start.downloadingHint')}</p>
+                {/* No need to wait: the AI keeps downloading, and a request just waits for it to finish. */}
+                <button type="button" class="ml-auto inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 font-medium text-white shadow-button hover:bg-brand-strong" onClick={onOpen}>
+                  {t('land.start.open')} <ArrowRight size={18} aria-hidden="true" />
+                </button>
+              </div>
             </div>
           ) : (
             <div class="flex flex-wrap items-center gap-4">
