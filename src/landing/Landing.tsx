@@ -13,6 +13,7 @@ import { DownloadProgress } from '../download';
 import { DeviceBadge, DeviceNote } from '../deviceUi';
 
 const MODE_ICONS: Record<AiMode, LucideIcon> = { chrome: Globe, compat: Cpu, fast: Zap, standard: Star, smart: Brain };
+const SOURCE_URL = 'https://github.com/Cessalan/browser-extension';
 const logo = `${import.meta.env.BASE_URL}icon.svg`;
 
 /**
@@ -22,7 +23,7 @@ const logo = `${import.meta.env.BASE_URL}icon.svg`;
 export function Landing({ onOpen }: { onOpen: () => void }) {
   const { lang, t } = useI18n();
   const start = useRef<HTMLElement>(null);
-  const how = useRef<HTMLElement>(null);
+  const example = useRef<HTMLElement>(null);
   const scrollTo = (el: HTMLElement | null) => el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
@@ -61,14 +62,22 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
               <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 font-medium text-white shadow-button hover:bg-brand-strong" onClick={() => scrollTo(start.current)}>
                 {t('land.cta')} <ArrowRight size={18} aria-hidden="true" />
               </button>
-              <button type="button" class="rounded-xl border border-line bg-surface px-5 py-3 font-medium shadow-sm hover:border-brand/40" onClick={() => scrollTo(how.current)}>
+              <button type="button" class="rounded-xl border border-line bg-surface px-5 py-3 font-medium shadow-sm hover:border-brand/40" onClick={() => scrollTo(example.current)}>
                 {t('land.howLink')}
               </button>
             </div>
-            <p class="mt-6 text-sm text-muted">{t('land.trustLine')}</p>
+            <p class="mt-3 text-sm text-muted">{t('land.setupNote')}</p>
+            <p class="mt-4 text-sm text-muted">{t('land.trustLine')}</p>
           </div>
           <ProductPreview />
         </div>
+      </section>
+
+      {/* Example: a full before/after, no download needed */}
+      <section ref={example} class="mx-auto max-w-6xl scroll-mt-20 px-5 pt-20">
+        <h2 class="text-3xl font-semibold tracking-tight">{t('land.ex.title')}</h2>
+        <p class="mt-3 text-lg text-muted">{t('land.ex.text')}</p>
+        <Example />
       </section>
 
       {/* Value */}
@@ -119,11 +128,23 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
             <PromiseItem icon={UserX} title="land.p3.title" text="land.p3.text" />
             <PromiseItem icon={FileSearch} title="land.p4.title" text="land.p4.text" />
           </div>
+          <div class="mt-12 rounded-2xl border border-white/15 p-6">
+            <h3 class="font-semibold">{t('land.it.title')}</h3>
+            <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-white/75">
+              <li>{t('land.it.download')}</li>
+              <li>{t('land.it.connections')}</li>
+              <li>{t('land.it.stored')}</li>
+            </ul>
+            <a href={SOURCE_URL} target="_blank" rel="noopener" class="mt-4 inline-block text-sm font-medium text-sky-300 underline">
+              {t('land.it.source')}
+            </a>
+            <p class="mt-4 text-sm text-white/60">{t('land.it.note')}</p>
+          </div>
         </div>
       </section>
 
       {/* How it works */}
-      <section ref={how} class="mx-auto max-w-6xl scroll-mt-20 px-5 py-20">
+      <section class="mx-auto max-w-6xl px-5 py-20">
         <h2 class="text-3xl font-semibold tracking-tight">{t('land.how.title')}</h2>
         <ol class="mt-10 grid gap-6 md:grid-cols-3">
           {(['1', '2', '3'] as const).map((n) => (
@@ -167,9 +188,35 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
           <span class="font-medium text-ink">Confi</span>
           <span>{t('land.footer')}</span>
           <a href={lang === 'fr' ? '/blog/' : '/en/blog/'} class="hover:text-ink">{t('nav.blog')}</a>
+          <a href={lang === 'fr' ? '/correcteur/' : '/en/french-grammar-checker/'} class="hover:text-ink">{t('gc.title')}</a>
           <span class="ml-auto">{t('app.version', { v: __APP_VERSION__ })}</span>
         </div>
       </footer>
+    </div>
+  );
+}
+
+/** A made-up note before and after a rewrite, separating "processed locally" from "details flagged". */
+function Example() {
+  const { t } = useI18n();
+  const flag = (text: string) =>
+    text.split('4482913').flatMap((part, i) => (i ? [<mark class="rounded bg-yellow-200 px-0.5">4482913</mark>, part] : [part]));
+  return (
+    <div class="mt-8">
+      <div class="grid gap-4 md:grid-cols-2">
+        <div class="rounded-2xl border border-line bg-surface p-5 shadow-card">
+          <p class="text-sm font-medium text-muted">{t('land.ex.before')}</p>
+          <p class="mt-2 leading-relaxed">{flag(t('land.ex.beforeText'))}</p>
+        </div>
+        <div class="rounded-2xl border border-brand/30 bg-surface p-5 shadow-card">
+          <p class="text-sm font-medium text-brand">{t('land.ex.after')}</p>
+          <p class="mt-2 leading-relaxed">{flag(t('land.ex.afterText'))}</p>
+        </div>
+      </div>
+      <ul class="mt-5 grid gap-3 text-sm md:grid-cols-2">
+        <li class="flex gap-2"><Lock size={16} class="mt-0.5 shrink-0 text-brand" aria-hidden="true" /> {t('land.ex.local')}</li>
+        <li class="flex gap-2"><span class="mt-1 h-3 w-3 shrink-0 rounded-sm bg-yellow-200" aria-hidden="true" /> {t('land.ex.flagged')}</li>
+      </ul>
     </div>
   );
 }
@@ -189,10 +236,10 @@ function ProductPreview() {
           <p>
             <del class="rounded bg-red-100 px-0.5 text-bad">{t('land.preview.old')}</del>{' '}
             <ins class="rounded bg-brand-soft px-0.5 text-brand no-underline">{t('land.preview.new')}</ins>{' '}
-            {t('land.preview.rest')} <span class="rounded bg-canvas px-1 font-mono text-sm">4482913</span>.
+            {t('land.preview.rest')} <mark class="rounded bg-yellow-200 px-0.5">4482913</mark>.
           </p>
           <p>
-            {t('land.preview.ask')} <mark class="rounded bg-yellow-200 px-0.5">{t('land.preview.deadline')}</mark>
+            {t('land.preview.ask')} {t('land.preview.deadline')}
           </p>
         </div>
       </div>

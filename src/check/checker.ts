@@ -26,25 +26,53 @@ function ask(req: Omit<SpellRequest, 'id'>): Promise<Issue[]> {
   });
 }
 
+// French grammar: Grammalecte (public/grammalecte-*, GPL v3), a classic worker because its files are plain scripts.
+const GRAMMALECTE = `${import.meta.env.BASE_URL}grammalecte-2.3.0/worker.js`;
+let grammarWorker: Worker | null = null;
+const grammarPending = new Map<number, (r: { errors?: { start: number; end: number; suggestions: string[]; message: string }[]; error?: string }) => void>();
+
+function frenchGrammar(text: string): Promise<Issue[]> {
+  if (!grammarWorker) {
+    grammarWorker = new Worker(GRAMMALECTE);
+    grammarWorker.onmessage = (e) => {
+      grammarPending.get(e.data.id)?.(e.data);
+      grammarPending.delete(e.data.id);
+    };
+  }
+  const id = ++nextId;
+  return new Promise((resolve, reject) => {
+    grammarPending.set(id, (r) =>
+      r.error || !r.errors
+        ? reject(new Error(r.error))
+        : resolve(
+            r.errors.map((x) => ({ start: x.start, end: x.end, text: text.slice(x.start, x.end), suggestions: x.suggestions.slice(0, 3), kind: 'grammar', message: x.message, source: 'rules' })),
+          ),
+    );
+    grammarWorker!.postMessage({ id, text });
+  });
+}
+
 /** Starts loading the spelling engine for a language in the background. */
 export function warmSpelling(lang: TextLang) {
   void ask({ warm: lang }).catch(() => {});
+  if (lang === 'fr') void frenchGrammar('').catch(() => {});
 }
 
 const cache = new Map<string, Promise<Issue[]>>();
 
 /**
  * All non-AI issues in one paragraph: our shorthand list and basic rules (instant), then the spelling
- * and grammar engine (in a worker). Cached by paragraph text, so only edited paragraphs are re-checked.
+ * and grammar engines (in workers; French grammar by Grammalecte). Cached by paragraph text, so only edited paragraphs are re-checked.
  */
 export function checkParagraph(text: string, lang: TextLang): Promise<Issue[]> {
   const key = `${lang}\u0000${text}`;
   let result = cache.get(key);
   if (!result) {
     const quick = [findShorthand(text, lang), findBasics(text, lang)];
-    result = ask({ lang, text })
-      .catch(() => [] as Issue[]) // engine unavailable: still show the quick checks
-      .then((engine) => mergeIssues([...quick, engine], protectedRanges(text)));
+    // Engines unavailable: still show the quick checks.
+    const spelling = ask({ lang, text }).catch(() => [] as Issue[]);
+    const grammar = lang === 'fr' ? frenchGrammar(text).catch(() => [] as Issue[]) : Promise.resolve([]);
+    result = Promise.all([spelling, grammar]).then(([spell, gramm]) => mergeIssues([...quick, spell, gramm], protectedRanges(text)));
     if (cache.size > 500) cache.clear();
     cache.set(key, result);
   }

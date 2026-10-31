@@ -10,6 +10,8 @@ export interface Issue {
   /** Best first. Empty when there is no sure fix (still worth underlining). */
   suggestions: string[];
   kind: IssueKind;
+  /** Why it's a mistake, when the engine explains it (Grammalecte, in French). */
+  message?: string;
   /** 'rules': spelling/grammar engines and our word lists, no AI. 'ai': a small edit proposed by the AI and checked by Confi. */
   source: 'rules' | 'ai';
 }

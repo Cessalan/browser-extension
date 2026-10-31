@@ -6,7 +6,7 @@ import dicUrl from '../../node_modules/dictionary-fr/index.dic?url';
 
 /**
  * Spelling and grammar without AI, off the main thread.
- * English: Harper (grammar + spelling engine). French: the LibreOffice/Hunspell dictionary (spelling).
+ * English: Harper (grammar + spelling engine). French: the LibreOffice/Hunspell dictionary (spelling); French grammar is Grammalecte, in its own worker (checker.ts).
  * Both load on first use (Harper ~2 s, the French dictionary ~5-10 s) and are cached by the service worker.
  */
 

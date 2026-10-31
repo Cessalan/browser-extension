@@ -42,6 +42,16 @@ export default defineConfig({
       },
     }),
   ],
+  // The French grammar checker has its own pages (one per language), so search engines can index them.
+  build: {
+    rollupOptions: {
+      input: {
+        index: 'index.html',
+        correcteur: 'correcteur/index.html',
+        frenchGrammarChecker: 'en/french-grammar-checker/index.html',
+      },
+    },
+  },
   worker: { format: 'es' },
   optimizeDeps: { exclude: ['@huggingface/transformers'] },
 });

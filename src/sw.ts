@@ -33,14 +33,14 @@ cleanupOutdatedCaches();
 // Any page address in scope (e.g. "/?mockai", "/#/setup" reloads) gets the app shell.
 registerRoute(
   new NavigationRoute(async ({ request }) => isolate((await matchPrecache('index.html')) ?? (await fetch(request))), {
-    // The blog is plain pages, not part of the app.
-    denylist: [/^\/blog\//, /^\/en\//, /^\/sitemap\.xml$/, /^\/robots\.txt$/],
+    // The blog and the French checker pages are their own pages, not the app shell.
+    denylist: [/^\/correcteur\//, /^\/blog\//, /^\/en\//, /^\/sitemap\.xml$/, /^\/robots\.txt$/],
   }),
 );
 
 // The AI and spelling engines (large scripts, WebAssembly, dictionaries) are cached the first time they're used.
 registerRoute(
-  ({ url }) => url.origin === self.location.origin && /\/assets\/.+\.(js|wasm|mjs|aff|dic)$/.test(url.pathname),
+  ({ url }) => url.origin === self.location.origin && (/\/assets\/.+\.(js|wasm|mjs|aff|dic)$/.test(url.pathname) || url.pathname.includes('/grammalecte-')),
   new CacheFirst({ cacheName: 'ai-engines', plugins: [isolatePlugin] }),
 );
 
