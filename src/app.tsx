@@ -114,6 +114,7 @@ export function App() {
         <span>{t('app.version', { v: __APP_VERSION__ })}</span>
         <a href="#/welcome" class="hover:text-ink">{t('land.about')}</a>
         <a href={lang === 'fr' ? '/blog/' : '/en/blog/'} class="hover:text-ink">{t('nav.blog')}</a>
+        <a href={lang === 'fr' ? '/correcteur/' : '/en/french-grammar-checker/'} class="hover:text-ink">{t('gc.title')}</a>
       </footer>
       </div>
     </div>

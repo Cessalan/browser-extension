@@ -33,8 +33,8 @@ cleanupOutdatedCaches();
 // Any page address in scope (e.g. "/?mockai", "/#/setup" reloads) gets the app shell.
 registerRoute(
   new NavigationRoute(async ({ request }) => isolate((await matchPrecache('index.html')) ?? (await fetch(request))), {
-    // The blog is plain pages, not part of the app.
-    denylist: [/^\/blog\//, /^\/en\//, /^\/sitemap\.xml$/, /^\/robots\.txt$/],
+    // The blog and the French checker pages are their own pages, not the app shell.
+    denylist: [/^\/correcteur\//, /^\/blog\//, /^\/en\//, /^\/sitemap\.xml$/, /^\/robots\.txt$/],
   }),
 );
 

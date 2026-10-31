@@ -188,6 +188,7 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
           <span class="font-medium text-ink">Confi</span>
           <span>{t('land.footer')}</span>
           <a href={lang === 'fr' ? '/blog/' : '/en/blog/'} class="hover:text-ink">{t('nav.blog')}</a>
+          <a href={lang === 'fr' ? '/correcteur/' : '/en/french-grammar-checker/'} class="hover:text-ink">{t('gc.title')}</a>
           <span class="ml-auto">{t('app.version', { v: __APP_VERSION__ })}</span>
         </div>
       </footer>

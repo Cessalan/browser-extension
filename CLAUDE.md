@@ -19,6 +19,7 @@ This project is unrelated to NurseQuizAI.
   - `src/bench/` (`#/bench`, linked from Setup's technical details): runs made-up samples through the real pipeline and scores them. Use it to tune prompts.
   - Names, addresses, places (`src/check/names.ts`): in "Built into Chrome" mode, the AI lists them shortly after typing stops; Confi keeps only those really in the text and protects them like numbers (`learnDetails` in `sensitive.ts`, memory only). The person can un-protect one (✕ on its chip).
   - Rich text editor: TipTap (`RichEditor.tsx`). The draft is stored as Markdown (`format.ts`) because that is what the AI reads and writes; copy puts HTML + plain text on the clipboard. `sensitive.ts` flags patient identifiers without AI.
+- `src/grammar/`: standalone French grammar checker pages, `/correcteur/` (FR) and `/en/french-grammar-checker/` (EN), separate Vite entries for SEO (`data-page-lang` on `<html>` fixes the UI language). Same editor and proofreading as Review; AI corrections only if the AI is already installed (never starts a download).
 - `src/speedtest/`: the Setup page (device check + AI mode). AI runs in Web Workers (`*.worker.ts`).
   - Text: WebLLM (`llm.ts`). `models.ts` maps AI modes (Faster / Standard / Smarter) to models.
   - `recommend.ts` picks the mode for each computer (specs first, then measured speed). Used until the nurse picks one.

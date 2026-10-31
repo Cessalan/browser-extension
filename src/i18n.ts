@@ -352,6 +352,33 @@ const en = {
   'land.faq.5.a': 'Yes. Paste your text into Confi, then copy the result back into Outlook, Gmail, Word or your records system. Bold text, highlights and lists are kept.',
   'land.footer': 'The private writing assistant for confidential text. No cookies, no tracking.',
   'land.about': 'About Confi',
+  'gc.docTitle': 'Free French grammar checker, private: nothing leaves your computer | Confi',
+  'gc.title': 'French grammar checker',
+  'gc.subtitle': 'Paste or type French text: spelling and grammar mistakes are underlined as you type. Click one to fix it. Free, no account, and your text never leaves your computer.',
+  'gc.placeholder': 'Type or paste your French text here…',
+  'gc.exampleText': 'Bonjour, les résultat de la prise de sang sont normale. Je vous ai envoyer le rapport hier et il faut que vous le signez avant vendredi. Merci de me tenir au courant.',
+  'gc.ai': 'Check with AI too',
+  'gc.aiSetup': 'Add AI corrections (one-time setup)',
+  'gc.copy': 'Copy text',
+  'gc.copied': 'Copied',
+  'gc.p1.title': 'Instant, no download',
+  'gc.p1.text': 'Agreement, conjugation, past participles, spelling: checked as you type by Grammalecte and a French dictionary, right in your browser.',
+  'gc.p2.title': 'AI when you want it',
+  'gc.p2.text': 'If Confi’s AI is set up on this computer, it can catch what the rules miss. You decide which corrections to keep.',
+  'gc.p3.title': 'Private',
+  'gc.p3.text': 'Your text is checked on your computer and never sent online. Nothing is saved when you close the tab.',
+  'gc.faq.title': 'Questions',
+  'gc.faq.1.q': 'Is it free?',
+  'gc.faq.1.a': 'Yes. No account, no ads, no limit on length.',
+  'gc.faq.2.q': 'Is my text sent anywhere?',
+  'gc.faq.2.a': 'No. The checker runs in your browser. The page only downloads its own files (about 2 MB, once), then works even offline.',
+  'gc.faq.3.q': 'What does it check?',
+  'gc.faq.3.a': 'Spelling, agreement (gender and number), verb conjugation, past participles, the subjunctive, common confusions (a/à, ces/ses…) and more, using Grammalecte, an open-source French grammar checker. Typography rules are turned off so ordinary emails aren’t flagged everywhere.',
+  'gc.faq.4.q': 'How is it different from Antidote or Scribens?',
+  'gc.faq.4.a': 'It is lighter and less complete than Antidote, but free and fully private: unlike online checkers, your text stays on your computer. That matters for text about patients, clients or employees.',
+  'gc.more': 'Need to rewrite, shorten or translate a text too? Confi does it with an AI that runs on your computer.',
+  'gc.moreCta': 'Discover Confi',
+  'gc.credit': 'French grammar by Grammalecte (GPL v3).',
 };
 
 export type Key = keyof typeof en;
@@ -696,6 +723,33 @@ const fr: Record<Key, string> = {
   'land.faq.5.a': 'Oui. Collez votre texte dans Confi, puis recopiez le résultat dans Outlook, Gmail, Word ou votre dossier informatisé. Le gras, le surlignage et les listes sont conservés.',
   'land.footer': 'L’assistant de rédaction privé pour vos textes confidentiels. Aucun témoin, aucun suivi.',
   'land.about': 'À propos de Confi',
+  'gc.docTitle': 'Correcteur de grammaire française gratuit et privé : rien ne quitte votre ordinateur | Confi',
+  'gc.title': 'Correcteur de français',
+  'gc.subtitle': 'Collez ou écrivez votre texte : les fautes d’orthographe et de grammaire sont soulignées pendant que vous écrivez. Cliquez pour corriger. Gratuit, sans compte, et votre texte ne quitte jamais votre ordinateur.',
+  'gc.placeholder': 'Écrivez ou collez votre texte ici…',
+  'gc.exampleText': 'Bonjour, les résultat de la prise de sang sont normale. Je vous ai envoyer le rapport hier et il faut que vous le signez avant vendredi. Merci de me tenir au courant.',
+  'gc.ai': 'Vérifier aussi avec l’IA',
+  'gc.aiSetup': 'Ajouter les corrections par IA (installation unique)',
+  'gc.copy': 'Copier le texte',
+  'gc.copied': 'Copié',
+  'gc.p1.title': 'Instantané, sans téléchargement',
+  'gc.p1.text': 'Accords, conjugaison, participes passés, orthographe : vérifiés pendant que vous écrivez par Grammalecte et un dictionnaire français, directement dans votre navigateur.',
+  'gc.p2.title': 'L’IA si vous le voulez',
+  'gc.p2.text': 'Si l’IA de Confi est installée sur cet ordinateur, elle repère ce que les règles laissent passer. Vous choisissez les corrections à garder.',
+  'gc.p3.title': 'Privé',
+  'gc.p3.text': 'Votre texte est vérifié sur votre ordinateur, jamais envoyé en ligne. Rien n’est enregistré à la fermeture de l’onglet.',
+  'gc.faq.title': 'Questions',
+  'gc.faq.1.q': 'Est-ce gratuit ?',
+  'gc.faq.1.a': 'Oui. Sans compte, sans publicité, sans limite de longueur.',
+  'gc.faq.2.q': 'Mon texte est-il envoyé quelque part ?',
+  'gc.faq.2.a': 'Non. Le correcteur fonctionne dans votre navigateur. La page ne télécharge que ses propres fichiers (environ 2 Mo, une fois), puis fonctionne même hors ligne.',
+  'gc.faq.3.q': 'Qu’est-ce qui est vérifié ?',
+  'gc.faq.3.a': 'L’orthographe, les accords (genre et nombre), la conjugaison, les participes passés, le subjonctif, les confusions courantes (a/à, ces/ses…) et plus encore, grâce à Grammalecte, un correcteur grammatical libre. Les règles de typographie sont désactivées pour ne pas tout souligner dans un simple courriel.',
+  'gc.faq.4.q': 'Quelle différence avec Antidote ou Scribens ?',
+  'gc.faq.4.a': 'Il est plus léger et moins complet qu’Antidote, mais gratuit et entièrement privé : contrairement aux correcteurs en ligne, votre texte reste sur votre ordinateur. C’est important pour les textes sur vos patients, clients ou employés.',
+  'gc.more': 'Besoin aussi de réécrire, raccourcir ou traduire un texte ? Confi le fait avec une IA qui fonctionne sur votre ordinateur.',
+  'gc.moreCta': 'Découvrir Confi',
+  'gc.credit': 'Grammaire française : Grammalecte (GPL v3).',
 };
 
 const DICTS: Record<Lang, Record<Key, string>> = { en, fr };
@@ -704,9 +758,13 @@ export function detectLang(languages: readonly string[] = navigator.languages ??
   return languages[0]?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
 }
 
-/** Always the browser's language when Confi opens; the header button switches it for the visit only. */
+/**
+ * The browser's language when Confi opens; the header button switches it for the visit only.
+ * A page made for one language (the French checker's pages) says so with data-page-lang on <html>.
+ */
 function initialLang(): Lang {
-  return detectLang();
+  const page = typeof document === 'undefined' ? undefined : document.documentElement.dataset.pageLang;
+  return page === 'fr' || page === 'en' ? page : detectLang();
 }
 
 export function translate(lang: Lang, key: Key, params?: Record<string, string | number>): string {

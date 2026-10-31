@@ -29,7 +29,7 @@ function ask(req: Omit<SpellRequest, 'id'>): Promise<Issue[]> {
 // French grammar: Grammalecte (public/grammalecte-*, GPL v3), a classic worker because its files are plain scripts.
 const GRAMMALECTE = `${import.meta.env.BASE_URL}grammalecte-2.3.0/worker.js`;
 let grammarWorker: Worker | null = null;
-const grammarPending = new Map<number, (r: { errors?: { start: number; end: number; suggestions: string[] }[]; error?: string }) => void>();
+const grammarPending = new Map<number, (r: { errors?: { start: number; end: number; suggestions: string[]; message: string }[]; error?: string }) => void>();
 
 function frenchGrammar(text: string): Promise<Issue[]> {
   if (!grammarWorker) {
@@ -45,7 +45,7 @@ function frenchGrammar(text: string): Promise<Issue[]> {
       r.error || !r.errors
         ? reject(new Error(r.error))
         : resolve(
-            r.errors.map((x) => ({ start: x.start, end: x.end, text: text.slice(x.start, x.end), suggestions: x.suggestions.slice(0, 3), kind: 'grammar', source: 'rules' })),
+            r.errors.map((x) => ({ start: x.start, end: x.end, text: text.slice(x.start, x.end), suggestions: x.suggestions.slice(0, 3), kind: 'grammar', message: x.message, source: 'rules' })),
           ),
     );
     grammarWorker!.postMessage({ id, text });

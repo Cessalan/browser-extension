@@ -251,6 +251,11 @@ export function IssuePopover({
           </span>
         )}
       </div>
+      {issue.message && (
+        <p class="mt-1.5 text-sm text-ink/80" lang="fr">
+          {issue.message}
+        </p>
+      )}
       {issue.suggestions.length ? (
         <div class="mt-2 flex flex-wrap gap-1.5">
           {issue.suggestions.map((s, i) => (
