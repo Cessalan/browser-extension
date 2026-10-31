@@ -7,6 +7,7 @@ import { setLang, useI18n } from './i18n';
 import { ArrowLeft, Languages, PenLine, RefreshCw, Settings2 } from 'lucide-preact';
 import { StylePanel } from './style/StylePanel';
 import { useRegisterSW } from 'virtual:pwa-register/preact';
+import { autoLoadAi } from './ai/autoload';
 
 // The email screen is home; Setup is reached from the gear button. (Notes will join home as a tab.)
 const PAGES: Record<string, () => preact.JSX.Element> = {
@@ -28,6 +29,9 @@ function isOnboarded() {
 
 // First visit: start on the landing page, which explains Confi and sets it up.
 if (!isOnboarded() && (location.hash === '' || location.hash === '#/')) location.replace('#/welcome');
+
+// The recommended AI starts downloading right away (see autoload.ts): no download step to click through.
+void autoLoadAi();
 
 function useHash() {
   const [hash, setHash] = useState(location.hash || '#/');
