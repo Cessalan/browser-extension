@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import type { Editor } from '@tiptap/core';
-import { Check, Copy, Languages, Lock, Sparkles, WifiOff, Zap } from 'lucide-preact';
+import { Check, Copy, Languages, Lock, Sparkles, Zap } from 'lucide-preact';
 import { setLang, translate, useI18n, type Key, type Lang } from '../i18n';
 import { useAiStatus } from '../ai/engine';
 import { RichEditor } from '../review/RichEditor';
@@ -64,16 +64,16 @@ export function GrammarPage() {
         </div>
       </header>
 
-      <main class="mx-auto max-w-4xl px-4 py-8">
-        <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{t('gc.title')}</h1>
-        <p class="mt-3 max-w-2xl text-lg text-muted">{t('gc.subtitle')}</p>
+      <main class="mx-auto max-w-4xl px-4 py-6">
+        <h1 class="text-2xl font-semibold tracking-tight">{t('gc.title')}</h1>
+        <p class="mt-1 text-muted">{t('gc.subtitle')}</p>
 
-        <div class="mt-6 overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
-          <div class="min-h-[14rem] px-5 py-4 text-[16px] leading-relaxed">
+        <div class="mt-4 overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+          <div class="min-h-[50vh] px-5 py-4 text-[16px] leading-relaxed">
             <RichEditor
               placeholder={t('gc.placeholder')}
               autofocus
-              class="min-h-[12rem]"
+              class="min-h-[46vh]"
               onReady={setEditor}
               onChange={(md) => setEmpty(!md.trim())}
             />
@@ -139,34 +139,27 @@ export function GrammarPage() {
           />
         )}
 
-        <ul class="mt-8 grid gap-4 sm:grid-cols-3">
-          <Point icon={Zap} title={t('gc.p1.title')} text={t('gc.p1.text')} />
-          <Point icon={Sparkles} title={t('gc.p2.title')} text={t('gc.p2.text')} />
-          <Point icon={Lock} title={t('gc.p3.title')} text={t('gc.p3.text')} />
-        </ul>
-
-        <section class="mt-12">
-          <h2 class="text-2xl font-semibold tracking-tight">{t('gc.faq.title')}</h2>
-          <div class="mt-4 divide-y divide-line rounded-2xl border border-line bg-surface">
+        {/* About the checker: below the editor, quiet, for whoever scrolls (and for search engines). */}
+        <section class="mt-24 border-t border-line pt-10 text-sm text-muted">
+          <ul class="grid gap-6 sm:grid-cols-3">
+            <Point icon={Zap} title={t('gc.p1.title')} text={t('gc.p1.text')} />
+            <Point icon={Sparkles} title={t('gc.p2.title')} text={t('gc.p2.text')} />
+            <Point icon={Lock} title={t('gc.p3.title')} text={t('gc.p3.text')} />
+          </ul>
+          <h2 class="mt-10 font-semibold text-ink">{t('gc.faq.title')}</h2>
+          <div class="mt-2 divide-y divide-line">
             {(['1', '2', '3', '4'] as const).map((k) => (
-              <details class="group px-5 py-4">
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-medium">
-                  {t(`gc.faq.${k}.q` as Key)}
-                  <span class="text-xl leading-none text-muted transition-transform group-open:rotate-45" aria-hidden="true">+</span>
-                </summary>
-                <p class="mt-2 leading-relaxed text-muted">{t(`gc.faq.${k}.a` as Key)}</p>
+              <details class="py-3">
+                <summary class="cursor-pointer text-ink">{t(`gc.faq.${k}.q` as Key)}</summary>
+                <p class="mt-1.5 leading-relaxed">{t(`gc.faq.${k}.a` as Key)}</p>
               </details>
             ))}
           </div>
+          <p class="mt-10">
+            {t('gc.more')}{' '}
+            <a href="/" class="font-medium text-brand hover:underline">{t('gc.moreCta')}</a>
+          </p>
         </section>
-
-        <div class="mt-10 flex flex-wrap items-center gap-4 rounded-2xl border border-brand/20 bg-brand-soft/50 p-5">
-          <WifiOff size={22} class="text-brand" aria-hidden="true" />
-          <p class="min-w-0 flex-1">{t('gc.more')}</p>
-          <a href="/" class="rounded-xl bg-brand px-4 py-2 font-medium text-white shadow-button hover:bg-brand-strong">
-            {t('gc.moreCta')}
-          </a>
-        </div>
       </main>
 
       <footer class="border-t border-line">
@@ -183,10 +176,11 @@ export function GrammarPage() {
 
 function Point({ icon: Icon, title, text }: { icon: typeof Zap; title: string; text: string }) {
   return (
-    <li class="rounded-2xl border border-line bg-surface p-5 shadow-card">
-      <Icon size={20} class="text-brand" aria-hidden="true" />
-      <h3 class="mt-3 font-semibold">{title}</h3>
-      <p class="mt-1 text-sm leading-relaxed text-muted">{text}</p>
+    <li>
+      <h3 class="flex items-center gap-2 font-medium text-ink">
+        <Icon size={15} class="text-brand" aria-hidden="true" /> {title}
+      </h3>
+      <p class="mt-1 leading-relaxed">{text}</p>
     </li>
   );
 }
