@@ -64,16 +64,18 @@ export function GrammarPage() {
         </div>
       </header>
 
-      <main class="mx-auto max-w-4xl px-4 py-6">
+      <main class="mx-auto max-w-4xl px-4">
+        {/* The checker fills the first screen (minus the header); everything else starts below it. */}
+        <div class="flex min-h-[calc(100dvh-57px)] flex-col py-6">
         <h1 class="text-2xl font-semibold tracking-tight">{t('gc.title')}</h1>
         <p class="mt-1 text-muted">{t('gc.subtitle')}</p>
 
-        <div class="mt-4 overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
-          <div class="min-h-[50vh] px-5 py-4 text-[16px] leading-relaxed">
+        <div class="mt-4 flex flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+          <div class="flex-1 px-5 py-4 text-[16px] leading-relaxed">
             <RichEditor
               placeholder={t('gc.placeholder')}
               autofocus
-              class="min-h-[46vh]"
+              class="min-h-[40vh]"
               onReady={setEditor}
               onChange={(md) => setEmpty(!md.trim())}
             />
@@ -129,6 +131,7 @@ export function GrammarPage() {
             </div>
           </div>
         </div>
+        </div>
         {proof.active && (
           <IssuePopover
             entry={proof.active.entry}
@@ -140,7 +143,7 @@ export function GrammarPage() {
         )}
 
         {/* About the checker: below the editor, quiet, for whoever scrolls (and for search engines). */}
-        <section class="mt-24 border-t border-line pt-10 text-sm text-muted">
+        <section class="border-t border-line py-10 text-sm text-muted">
           <ul class="grid gap-6 sm:grid-cols-3">
             <Point icon={Zap} title={t('gc.p1.title')} text={t('gc.p1.text')} />
             <Point icon={Sparkles} title={t('gc.p2.title')} text={t('gc.p2.text')} />
