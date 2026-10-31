@@ -40,7 +40,7 @@ registerRoute(
 
 // The AI and spelling engines (large scripts, WebAssembly, dictionaries) are cached the first time they're used.
 registerRoute(
-  ({ url }) => url.origin === self.location.origin && /\/assets\/.+\.(js|wasm|mjs|aff|dic)$/.test(url.pathname),
+  ({ url }) => url.origin === self.location.origin && (/\/assets\/.+\.(js|wasm|mjs|aff|dic)$/.test(url.pathname) || url.pathname.includes('/grammalecte-')),
   new CacheFirst({ cacheName: 'ai-engines', plugins: [isolatePlugin] }),
 );
 
