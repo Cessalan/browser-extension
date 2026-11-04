@@ -27,6 +27,7 @@ import { countChanges, diffWords, type DiffPart } from './diff';
 import { modeInfo, type AiMode } from '../speedtest/models';
 import type { Editor } from '@tiptap/core';
 import { FormatBar, RichEditor, selectText } from './RichEditor';
+import { DictateButton } from '../dictate/DictateButton';
 import { markdownToHtml, markdownToPlain } from './format';
 
 // Made-up examples. Never use real patient data here.
@@ -518,6 +519,7 @@ export function ReviewEmail() {
                 <Button variant="ghost" onClick={() => { setEditorContent(history.at(-1) ?? ''); setHistory((h) => h.slice(0, -1)); }} disabled={!history.length} title={t('editor.undoTitle')} icon={Undo2}>
                   {t('editor.undo')}
                 </Button>
+                <DictateButton editor={editor} lang={lang} />
                 <Button variant="ghost" onClick={newText} disabled={!draft} icon={FilePlus} title={t('editor.newTextTitle')}>
                   {t('editor.newText')}
                 </Button>
