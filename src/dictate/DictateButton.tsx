@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Editor } from '@tiptap/core';
-import { Loader2, Mic, Square } from 'lucide-preact';
+import { Loader2, Mic, Sparkles, Square } from 'lucide-preact';
 import { useI18n } from '../i18n';
 import { dictationSupported, startDictation, type DictateSession, type DictateState } from './dictate';
 
@@ -52,6 +52,7 @@ export function DictateButton({ editor, lang }: { editor: Editor | null; lang: '
     >
       <Icon size={16} aria-hidden="true" class={busy ? 'animate-spin' : state.phase === 'listening' ? 'animate-pulse' : ''} />
       {label}
+      {state.phase === 'idle' && <Sparkles size={12} class="-ml-0.5 -mt-2 text-brand" aria-hidden="true" />}
     </button>
   );
 }
