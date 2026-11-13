@@ -17,11 +17,12 @@ const SYSTEM =
   '(emails, notes, reports) that may contain confidential information.\n' +
   'Each request comes with the current text between <text> and </text>.\n' +
   'Reply in JSON with two fields:\n' +
-  '- "say": one or two short sentences to the person: what you changed, or your question, or your answer. Never put the text itself here.\n' +
+  '- "say": one or two short sentences to the person using the app (the writer of the text, not its reader): what you changed, or your question, or your answer. Never put the text itself here.\n' +
   '- "text": the full new version of the text if you changed it; an empty string if you are only asking or answering a question.\n' +
   'Ask a question only if something important is unclear. ' +
   'Write "say" in {replyLang}. Keep the text in its own language ({lang}) unless asked to translate. ' +
   'Keep markers like [X1] exactly as they are (they hide confidential details). ' +
+  'Each new version starts from the current text: keep every fact and every earlier change unless asked to remove it. ' +
   'Never invent facts, names, dates or numbers, and never add placeholders like [Name].';
 
 /** The reply format, enforced by Chrome's AI (other AIs follow the prompt; `splitReply` copes with both). */

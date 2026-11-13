@@ -24,8 +24,8 @@ const GREETED = /^(\s*(?:Bonjour|Bonsoir|Allô|Salut|Cher|Chère|Hi|Hello|Dear|G
 /** Replaces names, numbers and other details with neutral placeholders: what gets saved never identifies anyone. */
 export function anonymize(text: string, lang: TextLang): string {
   let out = text;
-  // Only the value: labels like "dossier" stay.
-  for (const m of findSensitive(text).map(detailValue).reverse()) out = out.slice(0, m.index) + PLACEHOLDER[lang][m.kind] + out.slice(m.index + m.text.length);
+  // Only the value: labels like "dossier" stay. A titled name goes whole ("Mme Gagnon" → [Nom]).
+  for (const m of findSensitive(text).map((m) => (m.kind === 'name' ? m : detailValue(m))).reverse()) out = out.slice(0, m.index) + PLACEHOLDER[lang][m.kind] + out.slice(m.index + m.text.length);
   const name = PLACEHOLDER[lang].name;
   return out.replace(TITLED, name).replace(GREETED, (_, greeting: string, who: string) => (who === name.slice(1, -1) ? _ : greeting + name));
 }

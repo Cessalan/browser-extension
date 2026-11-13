@@ -67,3 +67,16 @@ describe('cleanRewrite', () => {
     expect(cleanRewrite('Hi Sam,\nHere is the update: all set.')).toBe('Hi Sam,\nHere is the update: all set.');
   });
 });
+
+describe('titled names in quick notes', () => {
+  it('locks a lowercase name after a title, but not the title', async () => {
+    const { lockDetails } = await import('../ai/mask');
+    const r = lockDetails('Pte vu par dre cossette pour ligature');
+    expect(r.text).toBe('Pte vu par dre [X1] pour ligature');
+    expect(r.locked.get('[X1]')).toBe('cossette');
+  });
+  it('ignores "madame la directrice"', async () => {
+    const { lockDetails } = await import('../ai/mask');
+    expect(lockDetails('Bonjour madame la directrice').text).toBe('Bonjour madame la directrice');
+  });
+});

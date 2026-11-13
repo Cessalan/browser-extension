@@ -8,6 +8,11 @@ export interface SensitiveMatch {
   learned?: true;
 }
 
+const TITLE = String.raw`(?:dre?|dr\.|docteure?|doctor|mme|mlle|madame|monsieur|mrs?\.?|ms\.?)`;
+// Words that follow a title without being a name ("madame la directrice", "docteur en médecine").
+const NOT_NAME = String.raw`(?!(?:la|le|les|l['’]|de|du|des|en|et|ou|a|à|au|the|or|and|of)(?![\p{L}'’-]))`;
+const TITLED_NAME = new RegExp(String.raw`(?<![\p{L}\p{N}])${TITLE}\s+${NOT_NAME}\p{L}[\p{L}'’-]{1,}`, 'giu');
+
 // Ordered by priority: when two patterns overlap, the earlier one wins. Covers English and French (Quebec) wording.
 const PATTERNS: { kind: SensitiveKind; re: RegExp }[] = [
   { kind: 'ssn', re: /\b\d{3}-\d{2}-\d{4}\b/g },
@@ -43,6 +48,13 @@ export function findSensitive(text: string): SensitiveMatch[] {
       if (!found.some((f) => m.index < f.index + f.text.length && f.index < end)) found.push({ kind, text: m[0], index: m.index, learned: true });
     }
   }
+  // A name after a title, even typed in lowercase as in quick notes ("vu par dre cossette"). Without this,
+  // the AI could drop or change the name before the AI name finder has run, and nobody would notice.
+  // Last, so a name the AI found ("Mme Gagnon") keeps its own chip.
+  for (const m of text.matchAll(TITLED_NAME)) {
+    const end = m.index + m[0].length;
+    if (!found.some((f) => m.index < f.index + f.text.length && f.index < end)) found.push({ kind: 'name', text: m[0], index: m.index });
+  }
   return found.sort((a, b) => a.index - b.index);
 }
 
@@ -73,6 +85,11 @@ export function forgetDetail(text: string) {
  * "14/03/1952" in "né le 14/03/1952". Labels can be translated or corrected; values never are.
  */
 export function detailValue(m: SensitiveMatch): SensitiveMatch {
+  if (m.kind === 'name' && !m.learned) {
+    // Lock the name, not its title: "dre" may still be corrected to "Dre".
+    const title = new RegExp(String.raw`^${TITLE}\s+`, 'iu').exec(m.text)?.[0] ?? '';
+    return { ...m, index: m.index + title.length, text: m.text.slice(title.length) };
+  }
   if (m.kind !== 'mrn' && m.kind !== 'dob') return m;
   const label = /^[^\d]*?(?=[A-Z0-9-]*\d[\w/.-]*$)/u.exec(m.text)?.[0] ?? '';
   return { ...m, index: m.index + label.length, text: m.text.slice(label.length) };
